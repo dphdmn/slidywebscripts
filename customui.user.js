@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      2.2.4
+// @version      2.2.5
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -104,7 +104,7 @@
         .slidy-select:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
         .slidy-text-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; font-size: 11px; border-radius: 3px; width: 120px; }
         .slidy-file-input { display: none; }
-        .slidy-see-stats-btn { display: none; width: 100px; margin: 10px; padding: 8px 16px; background: rgba(60,60,60,0.8); color: white; border: 1px solid #555; cursor: pointer; font-size: 14px; font-weight: bold; transition: background 0.3s; }
+        .slidy-see-stats-btn { display: none; width: 100px; margin: 10px; padding: 4px 16px; background: rgba(60,60,60,0.8); color: white; border: 1px solid #555; cursor: pointer; font-size: 14px; font-weight: bold; transition: background 0.3s; }
         .slidy-see-stats-btn:hover { background: rgba(250,250,250,0.8); color: black; }
     `;
     document.head.appendChild(styleEl);
