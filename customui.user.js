@@ -14,13 +14,98 @@
 (function() {
     'use strict';
 
+    // ==================== DEFAULT CONFIGURATION ====================
+
+    const DEFAULT_CONFIG = {
+        bgDim: 0.5,
+        puzzleDim: 1,
+        uiOpacity: 0.8,
+        puzzleLeft: -125,
+        puzzleTop: 0,
+        borderWidth: 0,
+        borderColor: '#000000',
+        gridsBorderWidth: 0,
+        gridsBorderColor: '#000000',
+        fontFamily: 'inherit',
+        fontSize: 30,
+        bold: false,
+        inactiveBrightness: 0.3,
+        base9: true,
+        soundEnabled: true,
+        soundVolume: 0.5,
+        soundDebounce: 40,
+        minimizeAvgs: true
+    };
+
+    const STORAGE_KEYS = {
+        bgDim: 'slidysim_dph_script_bg_dim',
+        puzzleDim: 'slidysim_dph_script_puzzle_dim',
+        uiOpacity: 'slidysim_dph_script_ui_opacity',
+        puzzleLeft: 'slidysim_dph_script_puzzle_left',
+        puzzleTop: 'slidysim_dph_script_puzzle_top',
+        borderWidth: 'slidysim_dph_script_border_width',
+        borderColor: 'slidysim_dph_script_border_color',
+        gridsBorderWidth: 'slidysim_dph_script_grids_border_width',
+        gridsBorderColor: 'slidysim_dph_script_grids_border_color',
+        fontFamily: 'slidysim_dph_script_font_family',
+        fontSize: 'slidysim_dph_script_font_size',
+        bold: 'slidysim_dph_script_bold',
+        inactiveBrightness: 'slidysim_dph_script_inactive_brightness',
+        base9: 'slidysim_dph_script_base9',
+        soundEnabled: 'slidysim_dph_script_sound_enabled',
+        soundVolume: 'slidysim_dph_script_sound_volume',
+        soundDebounce: 'slidysim_dph_script_sound_debounce',
+        minimizeAvgs: 'slidysim_dph_script_minimize_avgs'
+    };
+
+    function getSetting(key) {
+        const stored = localStorage.getItem(STORAGE_KEYS[key]);
+        if (stored === null) return DEFAULT_CONFIG[key];
+        const def = DEFAULT_CONFIG[key];
+        if (typeof def === 'boolean') return stored !== 'false';
+        if (typeof def === 'number') {
+            if (Number.isInteger(def)) return parseInt(stored, 10);
+            return parseFloat(stored);
+        }
+        return stored;
+    }
+
+    function setSetting(key, value) {
+        localStorage.setItem(STORAGE_KEYS[key], value);
+    }
+
+    // ==================== INJECTED STYLES ====================
+
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `
+        .slidy-controls { display: flex; align-items: center; gap: 8px; margin-left: 12px; position: relative; }
+        .slidy-dropdown-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 8px; cursor: pointer; font-size: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+        .slidy-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: rgba(30, 30, 30, 0.95); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; min-width: 300px; max-height: 80vh; overflow-y: auto; z-index: 10000; margin-top: 4px; }
+        .slidy-action-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; cursor: pointer; font-size: 12px; border-radius: 3px; width: 100%; margin-bottom: 8px; }
+        .slidy-action-btn.danger { background: rgba(255,255,255,0.08); color: #ffdddd; }
+        .slidy-section-label { color: #999; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
+        .slidy-section-label:first-of-type { margin-top: 0; }
+        .slidy-setting-container { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+        .slidy-setting-container.hidden { display: none; }
+        .slidy-setting-label { color: #ccc; font-size: 11px; min-width: 70px; }
+        .slidy-slider { width: 200px; height: 4px; cursor: pointer; }
+        .slidy-slider-value { color: #ccc; font-size: 11px; min-width: 35px; }
+        .slidy-color-input { width: 24px; height: 20px; border: none; cursor: pointer; padding: 0; background: none; }
+        .slidy-checkbox { width: 14px; height: 14px; cursor: pointer; margin: 0; }
+        .slidy-select { background: #1e1e1e; border: 1px solid #333; color: #eaeaea; padding: 4px 6px; font-size: 11px; border-radius: 4px; width: 200px; cursor: pointer; outline: none; transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease; }
+        .slidy-select:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
+        .slidy-text-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; font-size: 11px; border-radius: 3px; width: 120px; }
+        .slidy-file-input { display: none; }
+        .slidy-see-stats-btn { display: none; width: 100px; margin: 10px; padding: 8px 16px; background: rgba(60,60,60,0.8); color: white; border: 1px solid #555; cursor: pointer; font-size: 14px; font-weight: bold; transition: background 0.3s; }
+        .slidy-see-stats-btn:hover { background: rgba(250,250,250,0.8); color: black; }
+    `;
+    document.head.appendChild(styleEl);
+
     // ==================== UTILITY FUNCTIONS ====================
 
     function resetAllSettings() {
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('slidysim_dph_script_')) {
-                localStorage.removeItem(key);
-            }
+        Object.keys(STORAGE_KEYS).forEach(key => {
+            localStorage.removeItem(STORAGE_KEYS[key]);
         });
 
         alert(
@@ -70,22 +155,18 @@
         } = config;
 
         const container = document.createElement('div');
-        container.style.cssText = `
-            display: ${type === 'hidden' ? 'none' : 'flex'};
-            align-items: center;
-            gap: 4px;
-            margin-bottom: 6px;
-            ${typeof containerStyle === 'string' ? containerStyle : ''}
-        `;
+        container.className = 'slidy-setting-container';
+        if (type === 'hidden') {
+            container.classList.add('hidden');
+        }
+        if (typeof containerStyle === 'string' && containerStyle) {
+            container.style.cssText += containerStyle;
+        }
         Object.assign(container.style, typeof containerStyle === 'object' ? containerStyle : {});
 
         const labelEl = document.createElement('span');
         labelEl.textContent = label + ':';
-        labelEl.style.cssText = `
-            color: #ccc;
-            font-size: 11px;
-            min-width: 70px;
-        `;
+        labelEl.className = 'slidy-setting-label';
         container.appendChild(labelEl);
 
         let input, valueDisplay;
@@ -97,21 +178,13 @@
                 input.min = min;
                 input.max = max;
                 input.step = step;
-                // FIXED: Parse the stored value as float, fallback to default
-                const storedValue = localStorage.getItem(storageKey);
-                input.value = storedValue !== null ? storedValue : defaultValue;
-                input.style.cssText = `
-                    width: 200px;
-                    height: 4px;
-                    cursor: pointer;
-                `;
+                // Use getSetting for default value
+                const settingKey = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
+                input.value = settingKey !== undefined ? getSetting(settingKey) : defaultValue;
+                input.className = 'slidy-slider';
 
                 valueDisplay = document.createElement('span');
-                valueDisplay.style.cssText = `
-                    color: #ccc;
-                    font-size: 11px;
-                    min-width: 35px;
-                `;
+                valueDisplay.className = 'slidy-slider-value';
 
                 // FIXED: Ensure display is updated on creation
                 updateSliderDisplay(input, valueDisplay, config);
@@ -130,16 +203,9 @@
             case 'color':
                 input = document.createElement('input');
                 input.type = 'color';
-                const storedColor = localStorage.getItem(storageKey);
-                input.value = storedColor || defaultValue;
-                input.style.cssText = `
-                    width: 24px;
-                    height: 20px;
-                    border: none;
-                    cursor: pointer;
-                    padding: 0;
-                    background: none;
-                `;
+                const settingKeyColor = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
+                input.value = settingKeyColor !== undefined ? getSetting(settingKeyColor) : defaultValue;
+                input.className = 'slidy-color-input';
 
                 input.addEventListener('input', () => {
                     localStorage.setItem(storageKey, input.value);
@@ -153,15 +219,10 @@
                 input = document.createElement('input');
                 input.type = 'checkbox';
                 input.id = id;
-                // Handle both 'false' string and null/undefined
-                const storedChecked = localStorage.getItem(storageKey);
-                input.checked = storedChecked === null ? (checked !== undefined ? checked : true) : storedChecked !== 'false';
-                input.style.cssText = `
-                    width: 14px;
-                    height: 14px;
-                    cursor: pointer;
-                    margin: 0;
-                `;
+                const settingKeyCheck = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
+                const storedChecked = settingKeyCheck !== undefined ? getSetting(settingKeyCheck) : null;
+                input.checked = storedChecked !== null ? storedChecked : (checked !== undefined ? checked : true);
+                input.className = 'slidy-checkbox';
 
                 input.addEventListener('change', () => {
                     localStorage.setItem(storageKey, input.checked);
@@ -173,28 +234,7 @@
 
             case 'select':
                 input = document.createElement('select');
-                input.style.cssText = `
-                    background: #1e1e1e;
-                    border: 1px solid #333;
-                    color: #eaeaea;
-                    padding: 4px 6px;
-                    font-size: 11px;
-                    border-radius: 4px;
-                    width: 200px;
-                    cursor: pointer;
-                    outline: none;
-                    transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-                `;
-
-                input.onfocus = () => {
-                    input.style.border = '1px solid #666';
-                    input.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.1)';
-                };
-
-                input.onblur = () => {
-                    input.style.border = '1px solid #333';
-                    input.style.boxShadow = 'none';
-                };
+                input.className = 'slidy-select';
 
                 options.forEach(opt => {
                     const option = document.createElement('option');
@@ -203,8 +243,8 @@
                     input.appendChild(option);
                 });
 
-                const storedSelect = localStorage.getItem(storageKey);
-                input.value = storedSelect || defaultValue;
+                const settingKeySelect = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
+                input.value = settingKeySelect !== undefined ? getSetting(settingKeySelect) : defaultValue;
 
                 input.addEventListener('change', () => {
                     localStorage.setItem(storageKey, input.value);
@@ -218,17 +258,9 @@
                 input = document.createElement('input');
                 input.type = 'text';
                 input.placeholder = placeholder || '';
-                const storedText = localStorage.getItem(storageKey);
-                input.value = storedText || defaultValue;
-                input.style.cssText = `
-                    background: rgba(255,255,255,0.1);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    color: white;
-                    padding: 2px 4px;
-                    font-size: 11px;
-                    border-radius: 3px;
-                    width: 120px;
-                `;
+                const settingKeyText = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
+                input.value = settingKeyText !== undefined ? getSetting(settingKeyText) : defaultValue;
+                input.className = 'slidy-text-input';
 
                 input.addEventListener('input', () => {
                     localStorage.setItem(storageKey, input.value);
@@ -321,88 +353,34 @@
     // ==================== UI CREATION ====================
 
     const controls = document.createElement('div');
-    controls.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-left: 12px;
-        position: relative;
-    `;
+    controls.className = 'slidy-controls';
 
     const dropdownBtn = document.createElement('button');
     dropdownBtn.textContent = '🖼️';
     dropdownBtn.title = 'Settings';
-    dropdownBtn.style.cssText = `
-        background: rgba(255,255,255,0.1);
-        border: 1px solid rgba(255,255,255,0.2);
-        color: white;
-        padding: 4px 8px;
-        cursor: pointer;
-        font-size: 14px;
-        border-radius: 3px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
+    dropdownBtn.className = 'slidy-dropdown-btn';
 
     const dropdownMenu = document.createElement('div');
-    dropdownMenu.style.cssText = `
-        display: none;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        background: rgba(30, 30, 30, 0.95);
-        border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 4px;
-        padding: 8px;
-        min-width: 300px;
-        max-height: 80vh;
-        overflow-y: auto;
-        z-index: 10000;
-        margin-top: 4px;
-    `;
+    dropdownMenu.className = 'slidy-dropdown-menu';
 
     // Upload/Remove buttons
     const uploadBtn = document.createElement('button');
     uploadBtn.textContent = '📁 Upload Background';
-    uploadBtn.style.cssText = `
-        background: rgba(255,255,255,0.1);
-        border: 1px solid rgba(255,255,255,0.2);
-        color: white;
-        padding: 6px 10px;
-        cursor: pointer;
-        font-size: 12px;
-        border-radius: 3px;
-        width: 100%;
-        margin-bottom: 8px;
-    `;
+    uploadBtn.className = 'slidy-action-btn';
 
     const removeBtn = document.createElement('button');
     removeBtn.textContent = '🗑️ Remove Background';
-    removeBtn.style.cssText = `
-        background: rgba(255,255,255,0.1);
-        border: 1px solid rgba(255,255,255,0.2);
-        color: white;
-        padding: 6px 10px;
-        cursor: pointer;
-        font-size: 12px;
-        border-radius: 3px;
-        width: 100%;
-        margin-bottom: 8px;
-        display: none;
-    `;
+    removeBtn.className = 'slidy-action-btn';
+    removeBtn.style.display = 'none';
 
     // Section helper
     function createSectionLabel(text, marginTop = '6px') {
         const label = document.createElement('div');
         label.textContent = text;
-        label.style.cssText = `
-            color: #999;
-            font-size: 14px;
-            font-weight: bold;
-            margin-top: ${marginTop};
-            margin-bottom: 6px;
-        `;
+        label.className = 'slidy-section-label';
+        if (marginTop && marginTop !== '6px') {
+            label.style.marginTop = marginTop;
+        }
         return label;
     }
 
@@ -414,8 +392,8 @@
         id: 'bg-dim',
         label: 'Background',
         type: 'slider',
-        defaultValue: '0.5',
-        storageKey: 'slidysim_dph_script_bg_dim',
+        defaultValue: DEFAULT_CONFIG.bgDim,
+        storageKey: STORAGE_KEYS.bgDim,
         unit: '%',
         min: '0',
         max: '1',
@@ -432,8 +410,8 @@
         id: 'puzzle-dim',
         label: 'Puzzle',
         type: 'slider',
-        defaultValue: '1',
-        storageKey: 'slidysim_dph_script_puzzle_dim',
+        defaultValue: DEFAULT_CONFIG.puzzleDim,
+        storageKey: STORAGE_KEYS.puzzleDim,
         unit: '%',
         min: '0',
         max: '1',
@@ -447,8 +425,8 @@
         id: 'ui-opacity',
         label: 'UI',
         type: 'slider',
-        defaultValue: '0.8',
-        storageKey: 'slidysim_dph_script_ui_opacity',
+        defaultValue: DEFAULT_CONFIG.uiOpacity,
+        storageKey: STORAGE_KEYS.uiOpacity,
         unit: '%',
         min: '0',
         max: '1',
@@ -462,8 +440,8 @@
         id: 'puzzle-left',
         label: 'Puzzle Left',
         type: 'slider',
-        defaultValue: '-125',
-        storageKey: 'slidysim_dph_script_puzzle_left',
+        defaultValue: DEFAULT_CONFIG.puzzleLeft,
+        storageKey: STORAGE_KEYS.puzzleLeft,
         unit: 'px',
         min: '-500',
         max: '500',
@@ -477,8 +455,8 @@
         id: 'puzzle-top',
         label: 'Puzzle Top',
         type: 'slider',
-        defaultValue: '0',
-        storageKey: 'slidysim_dph_script_puzzle_top',
+        defaultValue: DEFAULT_CONFIG.puzzleTop,
+        storageKey: STORAGE_KEYS.puzzleTop,
         unit: 'px',
         min: '-500',
         max: '500',
@@ -492,8 +470,8 @@
         id: 'border-width',
         label: 'Border',
         type: 'slider',
-        defaultValue: '0',
-        storageKey: 'slidysim_dph_script_border_width',
+        defaultValue: DEFAULT_CONFIG.borderWidth,
+        storageKey: STORAGE_KEYS.borderWidth,
         unit: 'px',
         min: '0',
         max: '5',
@@ -507,8 +485,8 @@
         id: 'border-color',
         label: '',
         type: 'color',
-        defaultValue: '#000000',
-        storageKey: 'slidysim_dph_script_border_color',
+        defaultValue: DEFAULT_CONFIG.borderColor,
+        storageKey: STORAGE_KEYS.borderColor,
         onChange: (val) => applyBorder(parseInt(settings.borderWidth.getValue()), val)
     });
     settings.borderColor = borderColorSetting;
@@ -519,8 +497,8 @@
         id: 'grids-border-width',
         label: 'Grids Border',
         type: 'slider',
-        defaultValue: '0',
-        storageKey: 'slidysim_dph_script_grids_border_width',
+        defaultValue: DEFAULT_CONFIG.gridsBorderWidth,
+        storageKey: STORAGE_KEYS.gridsBorderWidth,
         unit: 'px',
         min: '0',
         max: '4',
@@ -534,8 +512,8 @@
         id: 'grids-border-color',
         label: '',
         type: 'color',
-        defaultValue: '#000000',
-        storageKey: 'slidysim_dph_script_grids_border_color',
+        defaultValue: DEFAULT_CONFIG.gridsBorderColor,
+        storageKey: STORAGE_KEYS.gridsBorderColor,
         onChange: (val) => applyGridsBorder(parseInt(settings.gridsBorderWidth.getValue()), val)
     });
     settings.gridsBorderColor = gridsBorderColorSetting;
@@ -597,8 +575,8 @@
         id: 'font-family',
         label: 'Font Family',
         type: 'select',
-        defaultValue: 'inherit',
-        storageKey: 'slidysim_dph_script_font_family',
+        defaultValue: DEFAULT_CONFIG.fontFamily,
+        storageKey: STORAGE_KEYS.fontFamily,
         options: fontOptions,
         onChange: (val) => {
             if (val === 'custom') {
@@ -608,7 +586,7 @@
                     applyFontFamily(customFont);
                 } else {
                     fontFamilySetting.setValue('inherit');
-                    localStorage.setItem('slidysim_dph_script_font_family', 'inherit');
+                    localStorage.setItem(STORAGE_KEYS.fontFamily, 'inherit');
                     applyFontFamily('inherit');
                 }
             } else {
@@ -623,8 +601,8 @@
         id: 'font-size',
         label: 'Font Size',
         type: 'slider',
-        defaultValue: '30',
-        storageKey: 'slidysim_dph_script_font_size',
+        defaultValue: DEFAULT_CONFIG.fontSize,
+        storageKey: STORAGE_KEYS.fontSize,
         unit: 'px',
         min: '10',
         max: '50',
@@ -638,8 +616,8 @@
         id: 'bold',
         label: 'Bold',
         type: 'checkbox',
-        defaultValue: false,
-        storageKey: 'slidysim_dph_script_bold',
+        defaultValue: DEFAULT_CONFIG.bold,
+        storageKey: STORAGE_KEYS.bold,
         onChange: (val) => applyBold(val)
     });
     settings.bold = boldSetting;
@@ -649,8 +627,8 @@
         id: 'inactive-brightness',
         label: 'Inactive Brightness',
         type: 'slider',
-        defaultValue: '0.3',
-        storageKey: 'slidysim_dph_script_inactive_brightness',
+        defaultValue: DEFAULT_CONFIG.inactiveBrightness,
+        storageKey: STORAGE_KEYS.inactiveBrightness,
         unit: '',
         min: '0',
         max: '1',
@@ -664,8 +642,8 @@
         id: 'base9',
         label: 'Base 9 for 9x9',
         type: 'checkbox',
-        defaultValue: true,
-        storageKey: 'slidysim_dph_script_base9',
+        defaultValue: DEFAULT_CONFIG.base9,
+        storageKey: STORAGE_KEYS.base9,
         onChange: (val) => {
             if (val) {
                 convertBase9();
@@ -679,8 +657,8 @@
         id: 'sound-enable',
         label: 'Sound',
         type: 'checkbox',
-        defaultValue: true,
-        storageKey: 'slidysim_dph_script_sound_enabled',
+        defaultValue: DEFAULT_CONFIG.soundEnabled,
+        storageKey: STORAGE_KEYS.soundEnabled,
         onChange: (val) => {
             if (val) {
                 initSound();
@@ -695,8 +673,8 @@
         id: 'sound-volume',
         label: 'Volume',
         type: 'slider',
-        defaultValue: '0',
-        storageKey: 'slidysim_dph_script_sound_volume',
+        defaultValue: DEFAULT_CONFIG.soundVolume,
+        storageKey: STORAGE_KEYS.soundVolume,
         unit: '',
         min: '0',
         max: '1',
@@ -714,8 +692,8 @@
         id: 'sound-debounce',
         label: 'Debounce',
         type: 'slider',
-        defaultValue: '40',
-        storageKey: 'slidysim_dph_script_sound_debounce',
+        defaultValue: DEFAULT_CONFIG.soundDebounce,
+        storageKey: STORAGE_KEYS.soundDebounce,
         unit: 'ms',
         min: '0',
         max: '50',
@@ -731,8 +709,8 @@
         id: 'minimize-avgs',
         label: 'Minimize avgs',
         type: 'checkbox',
-        defaultValue: true,
-        storageKey: 'slidysim_dph_script_minimize_avgs',
+        defaultValue: DEFAULT_CONFIG.minimizeAvgs,
+        storageKey: STORAGE_KEYS.minimizeAvgs,
         onChange: (val) => {
             if (val) {
                 replaceText();
@@ -743,17 +721,7 @@
 
     const resetBtn = document.createElement('button');
     resetBtn.textContent = '❌ Reset settings';
-    resetBtn.style.cssText = `
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.2);
-        color: #ffdddd;
-        padding: 6px 10px;
-        cursor: pointer;
-        font-size: 12px;
-        border-radius: 3px;
-        width: 100%;
-        margin-bottom: 8px;
-    `;
+    resetBtn.className = 'slidy-action-btn danger';
 
     resetBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -828,7 +796,7 @@
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
-    fileInput.style.display = 'none';
+    fileInput.className = 'slidy-file-input';
     document.body.appendChild(fileInput);
 
     function applyBackground(blobUrl, dimAmount) {
@@ -1017,13 +985,13 @@
     // ==================== SOUND FUNCTIONALITY ====================
 
     let soundAudio = null;
-    let soundDebounceTime = parseInt(localStorage.getItem('slidysim_dph_script_sound_debounce') || '40');
+    let soundDebounceTime = getSetting('soundDebounce');
     let soundObserver = null;
 
     function createAudio() {
     if (!soundAudio) {
         soundAudio = new Audio('data:audio/mpeg;base64,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');
-        soundAudio.volume = parseFloat(localStorage.getItem('slidysim_dph_script_sound_volume') || '0.5');
+        soundAudio.volume = getSetting('soundVolume');
         soundAudio.preload = 'auto';
         soundAudio.load();
     }
@@ -1116,41 +1084,41 @@
 
     async function restoreSettings() {
         // Restore background dim
-        const savedBgDim = parseFloat(localStorage.getItem('slidysim_dph_script_bg_dim') || '0.5');
+        const savedBgDim = getSetting('bgDim');
         bgDimSetting.setValue(savedBgDim);
 
         // Restore puzzle dim
-        const savedPuzzleDim = parseFloat(localStorage.getItem('slidysim_dph_script_puzzle_dim') || '1');
+        const savedPuzzleDim = getSetting('puzzleDim');
         puzzleDimSetting.setValue(savedPuzzleDim);
         applyPuzzleDim(savedPuzzleDim);
 
         // Restore UI opacity
-        const savedUIOpacity = parseFloat(localStorage.getItem('slidysim_dph_script_ui_opacity') || '0.8');
+        const savedUIOpacity = getSetting('uiOpacity');
         uiOpacitySetting.setValue(savedUIOpacity);
         applyUIOpacity(savedUIOpacity);
 
         // Restore puzzle position
-        const savedPuzzleLeft = parseFloat(localStorage.getItem('slidysim_dph_script_puzzle_left') || '-125');
+        const savedPuzzleLeft = getSetting('puzzleLeft');
         puzzleLeftSetting.setValue(savedPuzzleLeft);
-        const savedPuzzleTop = parseFloat(localStorage.getItem('slidysim_dph_script_puzzle_top') || '0');
+        const savedPuzzleTop = getSetting('puzzleTop');
         puzzleTopSetting.setValue(savedPuzzleTop);
         applyPuzzlePosition();
 
         // Restore borders
-        const savedBorderWidth = parseInt(localStorage.getItem('slidysim_dph_script_border_width') || '0');
-        const savedBorderColor = localStorage.getItem('slidysim_dph_script_border_color') || '#000000';
+        const savedBorderWidth = getSetting('borderWidth');
+        const savedBorderColor = getSetting('borderColor');
         borderWidthSetting.setValue(savedBorderWidth);
         borderColorSetting.setValue(savedBorderColor);
         applyBorder(savedBorderWidth, savedBorderColor);
 
         // Restore grids borders
-        const savedGridsBorderWidth = parseInt(localStorage.getItem('slidysim_dph_script_grids_border_width') || '0');
-        const savedGridsBorderColor = localStorage.getItem('slidysim_dph_script_grids_border_color') || '#000000';
+        const savedGridsBorderWidth = getSetting('gridsBorderWidth');
+        const savedGridsBorderColor = getSetting('gridsBorderColor');
         gridsBorderWidthSetting.setValue(savedGridsBorderWidth);
         gridsBorderColorSetting.setValue(savedGridsBorderColor);
 
         // Restore font settings
-        const savedFontFamily = localStorage.getItem('slidysim_dph_script_font_family') || 'inherit';
+        const savedFontFamily = getSetting('fontFamily');
         const customFont = localStorage.getItem('slidysim_dph_script_font_family_custom');
         if (savedFontFamily === 'custom' && customFont) {
             fontFamilySetting.setValue(customFont);
@@ -1160,37 +1128,37 @@
             applyFontFamily(savedFontFamily);
         }
 
-        const savedFontSize = parseInt(localStorage.getItem('slidysim_dph_script_font_size') || '30');
+        const savedFontSize = getSetting('fontSize');
         fontSizeSetting.setValue(savedFontSize);
         applyFontSize(savedFontSize);
 
-        const savedBold = localStorage.getItem('slidysim_dph_script_bold') === 'true';
+        const savedBold = getSetting('bold');
         boldSetting.setValue(savedBold);
         applyBold(savedBold);
 
         // Restore inactive brightness
-        const savedInactiveBrightness = parseFloat(localStorage.getItem('slidysim_dph_script_inactive_brightness') || '0.3');
+        const savedInactiveBrightness = getSetting('inactiveBrightness');
         inactiveBrightnessSetting.setValue(savedInactiveBrightness);
         applyInactiveBrightness(savedInactiveBrightness);
 
         // Restore base9
-        const savedBase9 = localStorage.getItem('slidysim_dph_script_base9') !== 'false';
+        const savedBase9 = getSetting('base9');
         base9Setting.setValue(savedBase9);
         if (savedBase9) {
             convertBase9();
         }
 
         // Restore sound settings
-        const savedSoundEnabled = localStorage.getItem('slidysim_dph_script_sound_enabled') !== 'false';
+        const savedSoundEnabled = getSetting('soundEnabled');
         soundEnableSetting.setValue(savedSoundEnabled);
-        const savedSoundVolume = parseFloat(localStorage.getItem('slidysim_dph_script_sound_volume') || '0.5');
+        const savedSoundVolume = getSetting('soundVolume');
         soundVolumeSetting.setValue(savedSoundVolume);
-        const savedSoundDebounce = parseInt(localStorage.getItem('slidysim_dph_script_sound_debounce') || '40');
+        const savedSoundDebounce = getSetting('soundDebounce');
         soundDebounceSetting.setValue(savedSoundDebounce);
         soundDebounceTime = savedSoundDebounce;
 
         // Restore minimize avgs
-        const minimizeAvgs = localStorage.getItem('slidysim_dph_script_minimize_avgs') !== 'false';
+        const minimizeAvgs = getSetting('minimizeAvgs');
         minimizeAvgsSetting.setValue(minimizeAvgs);
         if (minimizeAvgs) {
             replaceText();
@@ -1274,19 +1242,7 @@
         const button = document.createElement('button');
         button.textContent = 'See stats';
         button.id = 'see-stats-button';
-        button.style.cssText = `
-        display: none;
-        width: 100px;
-        margin: 10px;
-        padding: 8px 16px;
-        background: rgba(60,60,60,0.8);
-        color: white;
-        border: 1px solid #555;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: bold;
-        transition: background 0.3s;
-    `;
+        button.className = 'slidy-see-stats-btn';
 
         button.addEventListener('mouseenter', () => {
             button.style.background = 'rgba(250,250,250,0.8)';
@@ -1384,12 +1340,12 @@
         updateButtonVisibility()
         removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
-        if (localStorage.getItem('slidysim_dph_script_minimize_avgs') !== 'false') {
+        if (getSetting('minimizeAvgs')) {
             replaceText();
             forcePuzzleLayout();
         }
 
-        if (localStorage.getItem('slidysim_dph_script_base9') !== 'false') {
+        if (getSetting('base9')) {
             convertBase9();
         }
 
@@ -1412,7 +1368,7 @@
         if (currentBlobUrl) {
             const mainContainer = document.querySelector('.main-content-container');
             if (mainContainer && !mainContainer.style.background.includes('blob:')) {
-                const savedBgDim = parseFloat(localStorage.getItem('slidysim_dph_script_bg_dim') || '0.5');
+                const savedBgDim = getSetting('bgDim');
                 applyBackground(currentBlobUrl, savedBgDim);
             }
         }
