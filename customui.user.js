@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      2.1.0
+// @version      2.2.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -18,6 +18,7 @@
 
     const DEFAULT_CONFIG = {
         bgDim: 0.5,
+        bgBlur: 0,
         puzzleDim: 1,
         uiOpacity: 0.8,
         puzzleLeft: -125,
@@ -34,11 +35,14 @@
         soundEnabled: true,
         soundVolume: 0.5,
         soundDebounce: 40,
-        minimizeAvgs: true
+        minimizeAvgs: true,
+        blankColorOpacity: 0,
+        blankColor: '#000000'
     };
 
     const STORAGE_KEYS = {
         bgDim: 'slidysim_dph_script_bg_dim',
+        bgBlur: 'slidysim_dph_script_bg_blur',
         puzzleDim: 'slidysim_dph_script_puzzle_dim',
         uiOpacity: 'slidysim_dph_script_ui_opacity',
         puzzleLeft: 'slidysim_dph_script_puzzle_left',
@@ -55,7 +59,9 @@
         soundEnabled: 'slidysim_dph_script_sound_enabled',
         soundVolume: 'slidysim_dph_script_sound_volume',
         soundDebounce: 'slidysim_dph_script_sound_debounce',
-        minimizeAvgs: 'slidysim_dph_script_minimize_avgs'
+        minimizeAvgs: 'slidysim_dph_script_minimize_avgs',
+        blankColorOpacity: 'slidysim_dph_script_blank_color_opacity',
+        blankColor: 'slidysim_dph_script_blank_color'
     };
 
     function getSetting(key) {
@@ -405,6 +411,23 @@
     });
     settings.bgDim = bgDimSetting;
 
+    // Background blur
+    const bgBlurSetting = createSetting({
+        id: 'bg-blur',
+        label: 'Blur',
+        type: 'slider',
+        defaultValue: DEFAULT_CONFIG.bgBlur,
+        storageKey: STORAGE_KEYS.bgBlur,
+        unit: 'px',
+        min: '0',
+        max: '20',
+        step: '1',
+        onChange: (val) => {
+            if (currentBlobUrl) applyBackground(currentBlobUrl);
+        }
+    });
+    settings.bgBlur = bgBlurSetting;
+
     // Puzzle dim
     const puzzleDimSetting = createSetting({
         id: 'puzzle-dim',
@@ -419,6 +442,32 @@
         onChange: (val) => applyPuzzleDim(parseFloat(val))
     });
     settings.puzzleDim = puzzleDimSetting;
+
+    // Blank color opacity
+    const blankColorOpacitySetting = createSetting({
+        id: 'blank-color-opacity',
+        label: 'Blank Opacity',
+        type: 'slider',
+        defaultValue: DEFAULT_CONFIG.blankColorOpacity,
+        storageKey: STORAGE_KEYS.blankColorOpacity,
+        unit: '%',
+        min: '0',
+        max: '1',
+        step: '0.01',
+        onChange: (val) => applyBlankColor()
+    });
+    settings.blankColorOpacity = blankColorOpacitySetting;
+
+    // Blank color picker
+    const blankColorSetting = createSetting({
+        id: 'blank-color',
+        label: 'Blank Color',
+        type: 'color',
+        defaultValue: DEFAULT_CONFIG.blankColor,
+        storageKey: STORAGE_KEYS.blankColor,
+        onChange: (val) => applyBlankColor()
+    });
+    settings.blankColor = blankColorSetting;
 
     // UI opacity
     const uiOpacitySetting = createSetting({
@@ -734,7 +783,10 @@
     dropdownMenu.appendChild(removeBtn);
     dropdownMenu.appendChild(createSectionLabel('Opacity settings:'));
     dropdownMenu.appendChild(bgDimSetting.container);
+    dropdownMenu.appendChild(bgBlurSetting.container);
     dropdownMenu.appendChild(puzzleDimSetting.container);
+    dropdownMenu.appendChild(blankColorOpacitySetting.container);
+    dropdownMenu.appendChild(blankColorSetting.container);
     dropdownMenu.appendChild(uiOpacitySetting.container);
     dropdownMenu.appendChild(createSectionLabel('Puzzle Position:'));
     dropdownMenu.appendChild(puzzleLeftSetting.container);
@@ -803,11 +855,35 @@
         const mainContainer = document.querySelector('.main-content-container');
         if (mainContainer && blobUrl) {
             const dim = dimAmount !== undefined ? dimAmount : parseFloat(settings.bgDim.getValue());
-            mainContainer.style.background = `linear-gradient(rgba(0, 0, 0, ${1 - dim}), rgba(0, 0, 0, ${1 - dim})), url('${blobUrl}')`;
-            mainContainer.style.backgroundSize = 'cover';
-            mainContainer.style.backgroundPosition = 'center';
-            mainContainer.style.backgroundRepeat = 'no-repeat';
-            mainContainer.style.backgroundAttachment = 'fixed';
+            const blur = settings.bgBlur ? parseFloat(settings.bgBlur.getValue()) : getSetting('bgBlur');
+            
+            // Use pseudo-element for blur effect
+            let blurStyleEl = document.getElementById('slidy-blur-bg-style');
+            if (!blurStyleEl) {
+                blurStyleEl = document.createElement('style');
+                blurStyleEl.id = 'slidy-blur-bg-style';
+                document.head.appendChild(blurStyleEl);
+            }
+            
+            // Combine multiple filters into a single filter property
+            const filters = [];
+            if (blur > 0) filters.push(`blur(${blur}px)`);
+            filters.push(`brightness(${dim})`);
+            const filterString = filters.join(' ');
+            
+            blurStyleEl.textContent = `
+                .main-content-container::before {
+                    content: '';
+                    position: absolute;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    background: url('${blobUrl}') center center / cover no-repeat fixed;
+                    filter: ${filterString};
+                    z-index: -1;
+                }
+            `;
+            
+            mainContainer.style.position = 'relative';
+            mainContainer.style.background = 'none';
         }
         removeModuleContainerBackground();
         const hasBg = !!blobUrl;
@@ -825,6 +901,12 @@
             mainContainer.style.backgroundPosition = '';
             mainContainer.style.backgroundRepeat = '';
             mainContainer.style.backgroundAttachment = '';
+            mainContainer.style.position = '';
+        }
+        // Remove blur style element
+        const blurStyleEl = document.getElementById('slidy-blur-bg-style');
+        if (blurStyleEl) {
+            blurStyleEl.remove();
         }
         if (currentBlobUrl) {
             URL.revokeObjectURL(currentBlobUrl);
@@ -846,6 +928,22 @@
         const puzzleElements = document.querySelectorAll('.puzzle');
         puzzleElements.forEach(element => {
             element.style.opacity = dimAmount;
+        });
+    }
+
+    function applyBlankColor() {
+        const opacity = parseFloat(settings.blankColorOpacity.getValue());
+        const color = settings.blankColor.getValue();
+        
+        // Parse the hex color to RGB
+        const hex = color.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        
+        const puzzleElements = document.querySelectorAll('.puzzle');
+        puzzleElements.forEach(element => {
+            element.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
         });
     }
 
@@ -1087,10 +1185,21 @@
         const savedBgDim = getSetting('bgDim');
         bgDimSetting.setValue(savedBgDim);
 
+        // Restore background blur
+        const savedBgBlur = getSetting('bgBlur');
+        bgBlurSetting.setValue(savedBgBlur);
+
         // Restore puzzle dim
         const savedPuzzleDim = getSetting('puzzleDim');
         puzzleDimSetting.setValue(savedPuzzleDim);
         applyPuzzleDim(savedPuzzleDim);
+
+        // Restore blank color settings
+        const savedBlankColorOpacity = getSetting('blankColorOpacity');
+        blankColorOpacitySetting.setValue(savedBlankColorOpacity);
+        const savedBlankColor = getSetting('blankColor');
+        blankColorSetting.setValue(savedBlankColor);
+        applyBlankColor();
 
         // Restore UI opacity
         const savedUIOpacity = getSetting('uiOpacity');
