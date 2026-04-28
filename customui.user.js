@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      2.2.1
+// @version      2.2.3
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -36,6 +36,7 @@
         soundVolume: 0.5,
         soundDebounce: 40,
         minimizeAvgs: true,
+        minimizeSessions: true,
         blankColorOpacity: 0,
         blankColor: '#000000'
     };
@@ -60,6 +61,7 @@
         soundVolume: 'slidysim_dph_script_sound_volume',
         soundDebounce: 'slidysim_dph_script_sound_debounce',
         minimizeAvgs: 'slidysim_dph_script_minimize_avgs',
+        minimizeSessions: 'slidysim_dph_script_minimize_sessions',
         blankColorOpacity: 'slidysim_dph_script_blank_color_opacity',
         blankColor: 'slidysim_dph_script_blank_color'
     };
@@ -768,6 +770,21 @@
     });
     settings.minimizeAvgs = minimizeAvgsSetting;
 
+    // Minimize sessions
+    const minimizeSessionsSetting = createSetting({
+        id: 'minimize-sessions',
+        label: 'Minimize sessions',
+        type: 'checkbox',
+        defaultValue: DEFAULT_CONFIG.minimizeSessions,
+        storageKey: STORAGE_KEYS.minimizeSessions,
+        onChange: (val) => {
+            if (val) {
+                minimizeSessions();
+            }
+        }
+    });
+    settings.minimizeSessions = minimizeSessionsSetting;
+
     const resetBtn = document.createElement('button');
     resetBtn.textContent = '❌ Reset settings';
     resetBtn.className = 'slidy-action-btn danger';
@@ -808,6 +825,7 @@
     dropdownMenu.appendChild(soundDebounceSetting.container);
     dropdownMenu.appendChild(createSectionLabel('Misc:'));
     dropdownMenu.appendChild(minimizeAvgsSetting.container);
+    dropdownMenu.appendChild(minimizeSessionsSetting.container);
     dropdownMenu.appendChild(createSectionLabel('⚠️Some changes require a refresh to apply'));
     dropdownMenu.appendChild(resetBtn);
 
@@ -856,7 +874,7 @@
         if (mainContainer && blobUrl) {
             const dim = dimAmount !== undefined ? dimAmount : parseFloat(settings.bgDim.getValue());
             const blur = settings.bgBlur ? parseFloat(settings.bgBlur.getValue()) : getSetting('bgBlur');
-            
+
             // Use pseudo-element for blur effect
             let blurStyleEl = document.getElementById('slidy-blur-bg-style');
             if (!blurStyleEl) {
@@ -864,13 +882,13 @@
                 blurStyleEl.id = 'slidy-blur-bg-style';
                 document.head.appendChild(blurStyleEl);
             }
-            
+
             // Combine multiple filters into a single filter property
             const filters = [];
             if (blur > 0) filters.push(`blur(${blur}px)`);
             filters.push(`brightness(${dim})`);
             const filterString = filters.join(' ');
-            
+
             blurStyleEl.textContent = `
                 .main-content-container::before {
                     content: '';
@@ -881,7 +899,7 @@
                     z-index: -1;
                 }
             `;
-            
+
             mainContainer.style.position = 'relative';
             mainContainer.style.background = 'none';
         }
@@ -934,13 +952,13 @@
     function applyBlankColor() {
         const opacity = parseFloat(settings.blankColorOpacity.getValue());
         const color = settings.blankColor.getValue();
-        
+
         // Parse the hex color to RGB
         const hex = color.replace('#', '');
         const r = parseInt(hex.substring(0, 2), 16);
         const g = parseInt(hex.substring(2, 4), 16);
         const b = parseInt(hex.substring(4, 6), 16);
-        
+
         const puzzleElements = document.querySelectorAll('.puzzle');
         puzzleElements.forEach(element => {
             element.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
@@ -1149,6 +1167,93 @@
         });
     }
 
+    function minimizeSessions() {
+        const sessionInfo = document.querySelector('.session-info');
+        if (!sessionInfo) return;
+        if (sessionInfo.getAttribute('data-slidy-sessions-minimized') === 'true') return;
+        const sessionBackgrounds = document.querySelectorAll('.session-background-inner');
+        sessionInfo.setAttribute('data-slidy-sessions-minimized', 'true');
+
+        sessionBackgrounds.forEach(bg => {
+            const sessionName = bg.querySelector('.session-name');
+            const sessionInfo = bg.querySelector('.session-info');
+
+            if (!sessionInfo) return;
+
+            const infoDivs = Array.from(sessionInfo.querySelectorAll('div'));
+
+            // Process each info div
+            infoDivs.forEach((div, index) => {
+                let text = div.textContent.trim();
+
+                // Remove "Standard" completely
+                if (text === 'Standard') {
+                    div.textContent = '\u00A0';
+                    return;
+                }
+
+                // Remove "Mouse hover (Lines)" completely
+                if (text === 'Mouse hover (Lines)') {
+                    div.textContent = '\u00A0';
+                    return;
+                }
+
+                // Replace "Fewest moves" with "FMC"
+                if (text === 'Fewest moves') {
+                    div.textContent = 'FMC';
+                    return;
+                }
+
+                // Replace "width+height relay" parts with "EUT"
+                if (text.includes('width+height relay')) {
+                    div.textContent = text.replace(/width\+height relay/g, 'EUT');
+                    return;
+                }
+
+                // Replace "2x2-" parts (with a minus) with empty string
+                if (text.includes('2x2-')) {
+                    div.textContent = text.replace(/2x2-/g, '');
+                    return;
+                }
+
+                // Remove " marathon" parts
+                if (text.includes(' marathon')) {
+                    div.textContent = text.replace(/ marathon/g, '');
+                    return;
+                }
+
+                // Remove " solves" parts
+                if (text.includes(' solves')) {
+                    div.textContent = text.replace(/ solves/g, '');
+                    return;
+                }
+
+            });
+            // Move the last div to the 2nd position AFTER processing
+            if (infoDivs.length >= 2) {
+                const lastDiv = infoDivs[infoDivs.length - 1];
+                const secondDiv = sessionInfo.children[1]; // Target position (2nd index)
+                sessionInfo.insertBefore(lastDiv, secondDiv);
+            }
+
+            // Check if first element of session-info is a substring of session-name
+            const remainingDivs = Array.from(sessionInfo.querySelectorAll('div'));
+            if (remainingDivs.length > 0 && sessionName) {
+                const firstInfoText = remainingDivs[0].textContent.trim();
+                const sessionNameText = sessionName.textContent.trim();
+
+                if (sessionNameText.includes(firstInfoText)) {
+                    remainingDivs[0].textContent = '\u00A0';
+                }
+            }
+            //remove one empty div if there is one:
+            const emptyDivs = Array.from(sessionInfo.querySelectorAll('div')).filter(div => div.textContent === '\u00A0');
+            if (emptyDivs.length > 0) {
+                emptyDivs[0].textContent = '';
+            }
+        });
+    }
+
     // ==================== EVENT HANDLERS ====================
 
     uploadBtn.addEventListener('click', (e) => {
@@ -1273,6 +1378,13 @@
             replaceText();
         }
 
+        // Restore minimize sessions
+        const savedMinimizeSessions = getSetting('minimizeSessions');
+        minimizeSessionsSetting.setValue(savedMinimizeSessions);
+        if (savedMinimizeSessions) {
+            minimizeSessions();
+        }
+
         // Load background from IndexedDB
         try {
             const blob = await loadFromDB();
@@ -1299,7 +1411,6 @@
                 applyBorder(parseInt(settings.borderWidth.getValue()), settings.borderColor.getValue());
                 applyPuzzleDim(parseFloat(settings.puzzleDim.getValue()));
                 applyPuzzlePosition();
-                // add other actions here later to use instead of using all the time in observer
             }, 10);
         }
 
@@ -1456,6 +1567,10 @@
 
         if (getSetting('base9')) {
             convertBase9();
+        }
+
+        if (getSetting('minimizeSessions')) {
+            minimizeSessions();
         }
 
         const logoutButton = document.querySelector('.user-menu .username-dropdown .item');
