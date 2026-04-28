@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      2.2.0
+// @version      2.2.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
