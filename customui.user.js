@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      2.2.6
+// @version      2.3.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -13,6 +13,10 @@
 
 (function () {
     'use strict';
+
+    let adjustButton = null;
+    let isEditingMode = false;
+    let dragHandle = null;
 
     // ==================== DEFAULT CONFIGURATION ====================
 
@@ -104,8 +108,47 @@
         .slidy-select:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
         .slidy-text-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; font-size: 11px; border-radius: 3px; width: 120px; }
         .slidy-file-input { display: none; }
-        .slidy-see-stats-btn { display: none; width: 100px; margin: 10px; padding: 4px 16px; background: rgba(60,60,60,0.8); color: white; border: 1px solid #555; cursor: pointer; font-size: 14px; font-weight: bold; transition: background 0.3s; }
-        .slidy-see-stats-btn:hover { background: rgba(250,250,250,0.8); color: black; }
+        .slidy-see-stats-btn { display: none; width: 140px; margin: 10px; padding: 6px 16px; background: rgba(60,60,60,0.9); color: white; border: 1px solid #666; cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .slidy-see-stats-btn:hover { background: rgba(80,80,80,0.95); border-color: #888; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .slidy-drag-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 36px;
+            background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%);
+            border: 1px solid #555;
+            border-radius: 8px;
+            cursor: move;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #ddd;
+            user-select: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .slidy-drag-handle:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+        .slidy-drag-handle:active {
+            cursor: grabbing;
+            transform: translate(-50%, -50%) scale(0.98);
+        }
+        .slidy-drag-handle::before,
+        .slidy-drag-handle::after {
+            content: '';
+            display: block;
+            width: 4px;
+            height: 16px;
+            border-left: 2px solid #999;
+            border-right: 2px solid #999;
+        }
     `;
     document.head.appendChild(styleEl);
 
@@ -845,6 +888,130 @@
         }
     });
 
+    function toggleEditingMode(e) {
+        e.stopPropagation();
+        if (isEditingMode) {
+            exitEditMode();
+        } else {
+            enterEditMode();
+        }
+    }
+
+    function enterEditMode() {
+        const puzzleContainer = document.querySelector('.puzzle-container');
+        if (!puzzleContainer) return;
+
+        setTimeout(() => {
+            const element = document.querySelector('.focus-area');
+            if (element) {
+                element.focus();
+            }
+        }, 10);
+        dragHandle = document.createElement('div');
+        dragHandle.className = 'slidy-drag-handle';
+        dragHandle.innerHTML = '<span>✥</span>';
+        puzzleContainer.appendChild(dragHandle);
+
+        puzzleContainer.style.position = 'relative';
+        puzzleContainer.style.zIndex = '10';
+
+        dragHandle.addEventListener('mousedown', onDragStart);
+        dragHandle.addEventListener('touchstart', onDragStart, { passive: false });
+
+        isEditingMode = true;
+        adjustButton.textContent = '✓ Done';
+    }
+
+    function exitEditMode() {
+        if (dragHandle) {
+            dragHandle.removeEventListener('mousedown', onDragStart);
+            dragHandle.removeEventListener('touchstart', onDragStart);
+            dragHandle.parentNode.removeChild(dragHandle);
+            dragHandle = null;
+        }
+        document.removeEventListener('mousemove', onDragMove);
+        document.removeEventListener('mouseup', onDragEnd);
+        document.removeEventListener('touchmove', onDragMove);
+        document.removeEventListener('touchend', onDragEnd);
+
+        isEditingMode = false;
+        adjustButton.textContent = 'Adjust puzzle';
+    }
+
+    let startX, startY, startLeft, startTop;
+
+    let puzzleContainer = null;          // cached container
+
+    function onDragStart(e) {
+        e.preventDefault();
+
+        // Cache container once at the start of the drag
+        if (!puzzleContainer) {
+            puzzleContainer = document.querySelector('.puzzle-container');
+        }
+        if (!puzzleContainer) return;
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        startX = clientX;
+        startY = clientY;
+
+        const currentLeft = parseFloat(puzzleContainer.style.left) || getSetting('puzzleLeft');
+        const currentTop = parseFloat(puzzleContainer.style.top) || getSetting('puzzleTop');
+        startLeft = currentLeft;
+        startTop = currentTop;
+
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd);
+    }
+
+
+    let pendingLeft = null, pendingTop = null;   // pending values for throttled update
+    let updateScheduled = false;
+
+    function scheduleUpdate() {
+        if (updateScheduled) return;
+        updateScheduled = true;
+        requestAnimationFrame(() => {
+            if (pendingLeft !== null && pendingTop !== null && puzzleContainer) {
+                puzzleContainer.style.left = pendingLeft + 'px';
+                puzzleContainer.style.top = pendingTop + 'px';
+                settings.puzzleLeft.setValue(pendingLeft);
+                settings.puzzleTop.setValue(pendingTop);
+            }
+            updateScheduled = false;
+        });
+    }
+
+    function onDragMove(e) {
+        e.preventDefault();
+        if (!isEditingMode || !dragHandle) return;
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const deltaX = clientX - startX;
+        const deltaY = clientY - startY;
+        let newLeft = Math.round(startLeft + deltaX);
+        let newTop = Math.round(startTop + deltaY);
+
+        newLeft = Math.min(500, Math.max(-500, newLeft));
+        newTop = Math.min(500, Math.max(-500, newTop));
+
+        // Store pending values and schedule one update per frame
+        pendingLeft = newLeft;
+        pendingTop = newTop;
+        scheduleUpdate();
+    }
+
+    function onDragEnd(e) {
+        document.removeEventListener('mousemove', onDragMove);
+        document.removeEventListener('mouseup', onDragEnd);
+        document.removeEventListener('touchmove', onDragMove);
+        document.removeEventListener('touchend', onDragEnd);
+    }
+
     // ==================== APPLICATION FUNCTIONS ====================
 
     function insertControls() {
@@ -854,12 +1021,21 @@
         const button = createSeeStatsButton();
         const filler = header.querySelector('.filler');
 
+        adjustButton = document.createElement('button');
+        adjustButton.textContent = 'Adjust puzzle';
+        adjustButton.id = 'adjust-puzzle-button';
+        adjustButton.className = 'slidy-see-stats-btn';
+        adjustButton.style.display = 'none';
+        adjustButton.addEventListener('click', toggleEditingMode);
+
         if (filler) {
             filler.parentNode.insertBefore(controls, filler);
             filler.parentNode.insertBefore(button, filler);
+            filler.parentNode.insertBefore(adjustButton, filler);
         } else {
             header.appendChild(controls);
             header.appendChild(button);
+            header.appendChild(adjustButton);
         }
     }
 
@@ -1548,6 +1724,10 @@
         } else {
             button.style.display = 'none';
         }
+
+        if (adjustButton) {
+            adjustButton.style.display = hasPuzzle ? 'block' : 'none';
+        }
     }
 
     // ==================== MAIN MUTATION OBSERVER ====================
@@ -1575,6 +1755,10 @@
 
         if (getSetting('minimizeSessions')) {
             minimizeSessions();
+        }
+
+        if (isEditingMode && !document.querySelector('.puzzle-container')) {
+            exitEditMode();
         }
 
         const logoutButton = document.querySelector('.user-menu .username-dropdown .item');
