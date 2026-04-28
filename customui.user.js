@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      2.2.5
+// @version      2.2.6
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1176,6 +1176,10 @@
 
         sessionBackgrounds.forEach(bg => {
             const sessionName = bg.querySelector('.session-name');
+            if (sessionName && ['delete', 'remove', 'hide', 'hidden'].includes(sessionName.textContent.trim().toLowerCase())) {
+                bg.parentNode.parentNode.parentNode.parentNode.style.display = 'none';
+                return;
+            }
             const sessionInfo = bg.querySelector('.session-info');
 
             if (!sessionInfo) return;
