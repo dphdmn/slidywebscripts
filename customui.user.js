@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.8.1
+// @version      3.9.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1163,6 +1163,13 @@
         const button = createSeeStatsButton();
         const filler = header.querySelector('.filler');
 
+        // Better LB button
+        const betterLBButton = document.createElement('button');
+        betterLBButton.textContent = 'Better LB';
+        betterLBButton.className = 'tab';
+        betterLBButton.style.color = 'rgb(100, 255, 255)';
+        betterLBButton.addEventListener('click', openLeaderboard);
+
         adjustButton = document.createElement('button');
         adjustButton.textContent = 'Adjust';
         adjustButton.id = 'adjust-puzzle-button';
@@ -1181,17 +1188,40 @@
         versionSpan.textContent = `script v${GM_info.script.version}`;
         versionSpan.className = 'slidy-version-span';
         if (filler) {
+            filler.parentNode.insertBefore(betterLBButton, filler);
             filler.parentNode.insertBefore(controls, filler);
             filler.parentNode.insertBefore(button, filler);
             filler.parentNode.insertBefore(adjustButton, filler);
             filler.parentNode.insertBefore(toggleCenterButton, filler);
             filler.parentNode.insertBefore(versionSpan, filler);
         } else {
+            header.appendChild(betterLBButton);
             header.appendChild(controls);
             header.appendChild(button);
             header.appendChild(adjustButton);
             header.appendChild(toggleCenterButton);
+            header.appendChild(versionSpan);
         }
+    }
+
+    function openLeaderboard() {
+        const container = document.getElementById('main-content-container');
+        if (!container) return;
+
+        // Clear existing content
+        container.innerHTML = '';
+
+        // Create iframe
+        const iframe = document.createElement('iframe');
+        iframe.src = 'https://slidysim.github.io/lb';
+        iframe.style.width = '100%';
+        iframe.style.height = '100vh';
+        iframe.style.border = 'none';
+        iframe.style.display = 'block';
+        iframe.title = 'Slidysim Leaderboard';
+
+        // Append iframe to container
+        container.appendChild(iframe);
     }
 
     function toggleCenterPosition() {
@@ -1205,7 +1235,7 @@
 
         settings.puzzleLeft.setValue(0);
         settings.puzzleTop.setValue(0);
-        
+
         setTimeout(() => {
             focusContainer.setAttribute('puzzle-position', 'center');
             applyPuzzlePosition();
