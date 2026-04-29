@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.0.2
+// @version      3.1.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1078,7 +1078,6 @@
 
     function insertControls() {
         const header = document.querySelector('.header');
-        if (!header) return;
 
         const button = createSeeStatsButton();
         const filler = header.querySelector('.filler');
@@ -1384,6 +1383,7 @@
     // ==================== TEXT REPLACEMENT ====================
 
     function replaceText() {
+       //console.log('Replacing text...');
         const headers = document.querySelectorAll('td[column="header"]');
         headers.forEach(header => {
             let text = header.textContent;
@@ -1660,20 +1660,14 @@
         document.addEventListener('click', handleUserInteraction);
     }
 
+
     async function init() {
         try {
             await openDB();
-            insertControls();
             await restoreSettings();
         } catch (error) {
             console.error('Failed to initialize:', error);
         }
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
     }
 
     function forcePuzzleLayout() {
@@ -1771,6 +1765,9 @@
     }
 
     function updateButtonVisibility() {
+        if (!document.querySelector('.slidy-controls')) {
+            insertControls();
+        }
         const button = document.getElementById('see-stats-button');
         if (!button) return;
 
@@ -1794,15 +1791,41 @@
 
     // ==================== MAIN MUTATION OBSERVER ====================
 
-    const mainObserver = new MutationObserver((mutations) => {
-        mainObserver.disconnect();
+    function preventMutationSpam(mutations) {
+        let isSessionAvg = false;
+        
         for (const mutation of mutations) {
-            if (mutation.target.closest?.('tr[avg="1"]')) {
-                mainObserver.observe(document.body, { childList: true, subtree: true });
-                return;
+            const target = mutation.target.closest?.('tr');
+            if (!target) continue;
+            
+            if (target.getAttribute('avg') === 'session') {
+                isSessionAvg = true;
+                break;
             }
         }
-        //console.log('mutations', mutations);
+        
+        if (isSessionAvg) {
+            //console.log('Session average mutation — bypassing timer check');
+            return false;
+        }
+        
+        for (const mutation of mutations) {
+            const target = mutation.target.closest?.('tr');
+            if (!target) continue;
+            
+            if (target.getAttribute('avg') === '1') {
+               //console.log('probably timer running');
+                mainObserver.observe(document.body, { childList: true, subtree: true });
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    const mainObserver = new MutationObserver((mutations) => {
+        mainObserver.disconnect();
+        if (preventMutationSpam(mutations)) return;
         updateButtonVisibility()
         removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
@@ -1847,10 +1870,6 @@
             }
         }
 
-        if (!document.body.contains(controls)) {
-            insertControls();
-        }
-
         mainObserver.observe(document.body, { childList: true, subtree: true });
     });
 
@@ -1883,7 +1902,8 @@
 
     let statsInitialized = false;
 
-    function initStats() {
+    async function initStats() {
+        await init();
         if (statsInitialized) return;
         statsInitialized = true;
 
