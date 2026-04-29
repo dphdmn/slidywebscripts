@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.7.1
+// @version      3.8.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -23,9 +23,12 @@
     document.head.insertAdjacentHTML('beforeend', '<style>.focus-area:focus-visible{outline:none!important}</style>'); //stupid outline fix
 
     let adjustButton = null;
+    let toggleCenterButton = null;
     let isEditingMode = false;
     let dragHandle = null;
     let scrambled = false;
+    let positionApplied = false;
+    let isCornerMode = false;
 
     // ==================== DEFAULT CONFIGURATION ====================
 
@@ -34,7 +37,7 @@
         bgBlur: 0,
         puzzleDim: 1,
         uiOpacity: 0.8,
-        puzzleLeft: -125,
+        puzzleLeft: 0,
         puzzleTop: 0,
         borderWidth: 0,
         borderColor: '#000000',
@@ -51,6 +54,7 @@
         minimizeAvgs: true,
         minimizeSessions: true,
         hideHeaderDuringSolves: true,
+        puzzleAlwaysInCenter: true,
         blankColorOpacity: 0,
         blankColor: '#000000',
         // New stats features
@@ -81,6 +85,7 @@
         minimizeAvgs: 'slidysim_dph_script_minimize_avgs',
         minimizeSessions: 'slidysim_dph_script_minimize_sessions',
         hideHeaderDuringSolves: 'slidysim_dph_script_hide_header_during_solves',
+        puzzleAlwaysInCenter: 'slidysim_dph_script_puzzle_always_in_center',
         blankColorOpacity: 'slidysim_dph_script_blank_color_opacity',
         blankColor: 'slidysim_dph_script_blank_color',
         // New stats features
@@ -126,13 +131,11 @@
         .slidy-text-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; font-size: 11px; border-radius: 3px; width: 120px; }
         .slidy-file-input { display: none; }
         .slidy-cursor-file-input { display: none; }
-        .slidy-see-stats-btn { display: none; min-width: 140px; margin: 5px; padding: 6px 16px; background: rgba(60,60,60,0.9); color: white; border: 1px solid #666; cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .slidy-see-stats-btn { display: none; min-width: 50px; margin-left: 5px; padding: 6px 16px; background: rgba(60,60,60,0.9); color: white; border: 1px solid #666; cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .slidy-see-stats-btn:hover { background: rgba(80,80,80,0.95); border-color: #888; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-        .slidy-drag-handle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 36px; background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%); border: 1px solid #555; border-radius: 8px; cursor: move; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: #ddd; user-select: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .slidy-drag-handle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%); border: 1px solid #555; border-radius: 8px; cursor: move; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 50px !important; color: #ddd; user-select: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); transition: transform 0.15s ease, box-shadow 0.15s ease; }
         .slidy-drag-handle:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15); }
         .slidy-drag-handle:active { cursor: grabbing; transform: translate(-50%, -50%) scale(0.98); }
-        .slidy-drag-handle::before,
-        .slidy-drag-handle::after { content: ''; display: block; width: 4px; height: 16px; border-left: 2px solid #999; border-right: 2px solid #999; }
         .slidy-version-span { font-weight: 700; padding-left: 6px; font-size: 11px; color: #999; letter-spacing: 0.5px; opacity: 0.8; }
     `;
     document.head.appendChild(styleEl);
@@ -588,8 +591,8 @@
         defaultValue: DEFAULT_CONFIG.puzzleLeft,
         storageKey: STORAGE_KEYS.puzzleLeft,
         unit: 'px',
-        min: '-500',
-        max: '500',
+        min: '0',
+        max: '1900',
         step: '1',
         onChange: (val) => applyPuzzlePosition()
     });
@@ -603,8 +606,8 @@
         defaultValue: DEFAULT_CONFIG.puzzleTop,
         storageKey: STORAGE_KEYS.puzzleTop,
         unit: 'px',
-        min: '-500',
-        max: '500',
+        min: '0',
+        max: '1000',
         step: '1',
         onChange: (val) => applyPuzzlePosition()
     });
@@ -890,6 +893,17 @@
     });
     settings.hideHeaderDuringSolves = hideHeaderDuringSolvesSetting;
 
+    // Puzzle always in center
+    const puzzleAlwaysInCenterSetting = createSetting({
+        id: 'puzzle-always-in-center',
+        label: 'Puzzle always in center',
+        type: 'checkbox',
+        defaultValue: DEFAULT_CONFIG.puzzleAlwaysInCenter,
+        storageKey: STORAGE_KEYS.puzzleAlwaysInCenter,
+        onChange: (val) => { }
+    });
+    settings.puzzleAlwaysInCenter = puzzleAlwaysInCenterSetting;
+
     // Custom cursor enabled
     const cursorEnabledSetting = createSetting({
         id: 'cursor-enabled',
@@ -991,6 +1005,7 @@
     dropdownMenu.appendChild(minimizeAvgsSetting.container);
     dropdownMenu.appendChild(minimizeSessionsSetting.container);
     dropdownMenu.appendChild(hideHeaderDuringSolvesSetting.container);
+    dropdownMenu.appendChild(puzzleAlwaysInCenterSetting.container);
     dropdownMenu.appendChild(cursorEnabledSetting.container);
     dropdownMenu.appendChild(createSectionLabel('Stats:'));
     dropdownMenu.appendChild(statsAveragesSetting.container);
@@ -1026,6 +1041,7 @@
 
     function enterEditMode() {
         const puzzleContainer = document.querySelector('.puzzle-container');
+        isCornerMode = true;
         if (!puzzleContainer) return;
 
         setTimeout(() => {
@@ -1036,7 +1052,7 @@
         }, 10);
         dragHandle = document.createElement('div');
         dragHandle.className = 'slidy-drag-handle';
-        dragHandle.innerHTML = '<span>✥</span>';
+        dragHandle.innerHTML = '<span style="font-size:50px;">✥</span>';
         puzzleContainer.appendChild(dragHandle);
 
         puzzleContainer.style.position = 'relative';
@@ -1046,7 +1062,7 @@
         dragHandle.addEventListener('touchstart', onDragStart, { passive: false });
 
         isEditingMode = true;
-        adjustButton.textContent = '✓ Done';
+        adjustButton.textContent = 'Done';
     }
 
     function exitEditMode() {
@@ -1062,7 +1078,7 @@
         document.removeEventListener('touchend', onDragEnd);
 
         isEditingMode = false;
-        adjustButton.textContent = 'Adjust puzzle';
+        adjustButton.textContent = 'Adjust';
     }
 
     let startX, startY, startLeft, startTop;
@@ -1123,8 +1139,8 @@
         let newLeft = Math.round(startLeft + deltaX);
         let newTop = Math.round(startTop + deltaY);
 
-        newLeft = Math.min(500, Math.max(-500, newLeft));
-        newTop = Math.min(500, Math.max(-500, newTop));
+        newLeft = Math.min(1900, Math.max(0, newLeft));
+        newTop = Math.min(1000, Math.max(0, newTop));
 
         // Store pending values and schedule one update per frame
         pendingLeft = newLeft;
@@ -1148,11 +1164,19 @@
         const filler = header.querySelector('.filler');
 
         adjustButton = document.createElement('button');
-        adjustButton.textContent = 'Adjust puzzle';
+        adjustButton.textContent = 'Adjust';
         adjustButton.id = 'adjust-puzzle-button';
         adjustButton.className = 'slidy-see-stats-btn';
         adjustButton.style.display = 'none';
         adjustButton.addEventListener('click', toggleEditingMode);
+
+        toggleCenterButton = document.createElement('button');
+        toggleCenterButton.textContent = 'Center';
+        toggleCenterButton.id = 'toggle-center-button';
+        toggleCenterButton.className = 'slidy-see-stats-btn';
+        toggleCenterButton.style.display = 'none';
+        toggleCenterButton.addEventListener('click', toggleCenterPosition);
+
         const versionSpan = document.createElement('span');
         versionSpan.textContent = `script v${GM_info.script.version}`;
         versionSpan.className = 'slidy-version-span';
@@ -1160,12 +1184,32 @@
             filler.parentNode.insertBefore(controls, filler);
             filler.parentNode.insertBefore(button, filler);
             filler.parentNode.insertBefore(adjustButton, filler);
+            filler.parentNode.insertBefore(toggleCenterButton, filler);
             filler.parentNode.insertBefore(versionSpan, filler);
         } else {
             header.appendChild(controls);
             header.appendChild(button);
             header.appendChild(adjustButton);
+            header.appendChild(toggleCenterButton);
         }
+    }
+
+    function toggleCenterPosition() {
+        isCornerMode = false;
+        if (isEditingMode) {
+            exitEditMode();
+        }
+        const focusContainer = document.querySelector('.focus-area');
+        if (!focusContainer) return;
+        positionApplied = true;
+
+        settings.puzzleLeft.setValue(-125);
+        settings.puzzleTop.setValue(0);
+        
+        setTimeout(() => {
+            focusContainer.setAttribute('puzzle-position', 'center');
+            applyPuzzlePosition(true);
+        }, 0);
     }
 
     const fileInput = document.createElement('input');
@@ -1365,19 +1409,30 @@
         });
     }
 
-    function applyPuzzlePosition() {
+    function applyPuzzlePosition(forceCenter = false) {
         const puzzleContainers = document.querySelectorAll('.puzzle-container');
+        const focusContainer = document.querySelector('.focus-area');
+        if (!focusContainer) {
+            positionApplied = false;
+            return;
+        }
+        if (isCornerMode) {
+            focusContainer.setAttribute('puzzle-position', 'corner');
+        }
         const leftVal = parseFloat(settings.puzzleLeft.getValue());
         const topVal = parseFloat(settings.puzzleTop.getValue());
 
-        
-        const addHeaderOffset = (settings.hideHeaderDuringSolves.getValue() && scrambled) ;
-  
+        const addHeaderOffset = (settings.hideHeaderDuringSolves.getValue() && scrambled);
+
         puzzleContainers.forEach(container => {
             container.style.position = 'relative';
             container.style.left = leftVal + 'px';
             if (addHeaderOffset) {
-                container.style.top = `calc(${topVal}px + var(--header_height) - 15px)`;
+                if (isCornerMode) {
+                    container.style.top = `calc(${topVal}px + var(--header_height))`;
+                } else {
+                    container.style.top = `calc(${topVal}px + var(--header_height) - 15px)`;
+                }
             } else {
                 container.style.top = topVal + 'px';
             }
@@ -1694,7 +1749,7 @@
     cursorUploadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         cursorFileInput.click();
-        
+
     });
 
     cursorRemoveBtn.addEventListener('click', async (e) => {
@@ -1931,7 +1986,7 @@
 
     function createSeeStatsButton() {
         const button = document.createElement('button');
-        button.textContent = 'See stats';
+        button.textContent = 'Stats';
         button.id = 'see-stats-button';
         button.className = 'slidy-see-stats-btn';
 
@@ -2021,6 +2076,9 @@
 
         if (adjustButton) {
             adjustButton.style.display = hasPuzzle ? 'block' : 'none';
+        }
+        if (toggleCenterButton) {
+            toggleCenterButton.style.display = hasPuzzle ? 'block' : 'none';
         }
     }
 
@@ -2177,6 +2235,9 @@
         updateButtonVisibility();
         initSound();
         applyPuzzlePosition();
+        if (!isEditingMode && !positionApplied && settings.puzzleAlwaysInCenter && settings.puzzleAlwaysInCenter.getValue()) {
+            toggleCenterPosition();
+        }
         removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
 
