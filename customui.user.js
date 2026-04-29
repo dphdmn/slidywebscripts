@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.3.0
+// @version      3.3.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1812,7 +1812,7 @@
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
         if (preventMutationSpam(mutations)) return;
-        console.log('Mutations observed:', mutations.length);
+        //console.log('Mutations observed:', mutations.length);
         updateButtonVisibility();
         initSound();
         applyPuzzlePosition();
