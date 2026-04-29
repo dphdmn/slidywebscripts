@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.4.1
+// @version      3.5.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -12,11 +12,13 @@
 // @grant        GM_addStyle
 // @grant        GM_getResourceURL
 // @grant        GM_xmlhttpRequest
+// @grant        GM_info
 // @require      https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js
 // @require      https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js
 // ==/UserScript==
 
 (function () {
+
     'use strict';
     document.head.insertAdjacentHTML('beforeend', '<style>.focus-area:focus-visible{outline:none!important}</style>'); //stupid outline fix
 
@@ -118,47 +120,14 @@
         .slidy-select:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
         .slidy-text-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; font-size: 11px; border-radius: 3px; width: 120px; }
         .slidy-file-input { display: none; }
-        .slidy-see-stats-btn { display: none; width: 140px; margin: 10px; padding: 6px 16px; background: rgba(60,60,60,0.9); color: white; border: 1px solid #666; cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .slidy-see-stats-btn { display: none; min-width: 140px; margin: 5px; padding: 6px 16px; background: rgba(60,60,60,0.9); color: white; border: 1px solid #666; cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .slidy-see-stats-btn:hover { background: rgba(80,80,80,0.95); border-color: #888; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-        .slidy-drag-handle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80px;
-            height: 36px;
-            background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%);
-            border: 1px solid #555;
-            border-radius: 8px;
-            cursor: move;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            font-size: 11px;
-            color: #ddd;
-            user-select: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        .slidy-drag-handle:hover {
-            transform: translate(-50%, -50%) scale(1.05);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
-        }
-        .slidy-drag-handle:active {
-            cursor: grabbing;
-            transform: translate(-50%, -50%) scale(0.98);
-        }
+        .slidy-drag-handle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 36px; background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%); border: 1px solid #555; border-radius: 8px; cursor: move; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: #ddd; user-select: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .slidy-drag-handle:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15); }
+        .slidy-drag-handle:active { cursor: grabbing; transform: translate(-50%, -50%) scale(0.98); }
         .slidy-drag-handle::before,
-        .slidy-drag-handle::after {
-            content: '';
-            display: block;
-            width: 4px;
-            height: 16px;
-            border-left: 2px solid #999;
-            border-right: 2px solid #999;
-        }
+        .slidy-drag-handle::after { content: ''; display: block; width: 4px; height: 16px; border-left: 2px solid #999; border-right: 2px solid #999; }
+        .slidy-version-span { font-weight: 700; padding-left: 6px; font-size: 11px; color: #999; letter-spacing: 0.5px; opacity: 0.8; }
     `;
     document.head.appendChild(styleEl);
 
@@ -1085,11 +1054,14 @@
         adjustButton.className = 'slidy-see-stats-btn';
         adjustButton.style.display = 'none';
         adjustButton.addEventListener('click', toggleEditingMode);
-
+        const versionSpan = document.createElement('span');
+        versionSpan.textContent = `script v${GM_info.script.version}`;
+        versionSpan.className = 'slidy-version-span';
         if (filler) {
             filler.parentNode.insertBefore(controls, filler);
             filler.parentNode.insertBefore(button, filler);
             filler.parentNode.insertBefore(adjustButton, filler);
+            filler.parentNode.insertBefore(versionSpan, filler);
         } else {
             header.appendChild(controls);
             header.appendChild(button);
@@ -2016,7 +1988,7 @@
         const replaysEnabled = settings.statsReplays?.getValue() !== false;
 
         if (!graphsEnabled && !avgsEnabled && !replaysEnabled) {
-           //console.log('All stats features disabled');
+            //console.log('All stats features disabled');
             return;
         }
 
