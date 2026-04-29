@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.0.1
+// @version      3.0.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3727,12 +3727,13 @@
                 currentWorker = null;
             }
 
+            const resetBtn = document.querySelector('.avgs-reset-btn');
             updateFilterSummary();
             if (!useDetailsForStats) {
                 updateSessionStats();
                 solves = filterSolves(allSolves);
+                if (resetBtn) resetBtn.style.display = 'none';
             } else {
-                const resetBtn = document.querySelector('.avgs-reset-btn');
                 if (resetBtn) resetBtn.style.display = 'block';
                 solves = fixDetailsSolvesData(allSolves);
                 type = getReplayType(solves);
