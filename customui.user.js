@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.1.0
+// @version      3.2.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -42,7 +42,7 @@
         inactiveBrightness: 0.3,
         base9: true,
         soundEnabled: true,
-        soundVolume: 0.5,
+        soundVolume: 0.01,
         soundDebounce: 40,
         minimizeAvgs: true,
         minimizeSessions: true,
@@ -93,10 +93,6 @@
             return parseFloat(stored);
         }
         return stored;
-    }
-
-    function setSetting(key, value) {
-        localStorage.setItem(STORAGE_KEYS[key], value);
     }
 
     // ==================== INJECTED STYLES ====================
@@ -1341,31 +1337,35 @@
     let soundDebounceTime = getSetting('soundDebounce');
     let soundObserver = null;
 
-    function createAudio() {
+    function initSound() {
+        const puzzle = document.querySelector('.puzzle');
+        const volume = getSetting('soundVolume');
+        
+        if (!puzzle || (volume < 0.02)) {
+            return;
+        }
+
         if (!soundAudio) {
             soundAudio = new Audio('data:audio/mpeg;base64,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');
-            soundAudio.volume = getSetting('soundVolume');
+            soundAudio.volume = volume;
             soundAudio.preload = 'auto';
             soundAudio.load();
         }
-        return soundAudio;
-    }
 
-    function initSound() {
-        createAudio();
-
-        const puzzle = document.querySelector('.puzzle');
-        if (!puzzle) {
-            setTimeout(initSound, 100);
+        // Check if observer already attached to this puzzle
+        if (puzzle._soundObserver) {
             return;
         }
 
         let lastPlay = 0;
-
         const observer = new MutationObserver(() => {
+            if (soundAudio.volume < 0.02) {
+                observer.disconnect();
+                puzzle._soundObserver = null;
+                return;
+            }
             const now = performance.now();
             if (now - lastPlay < soundDebounceTime) return;
-            if (soundAudio.volume < 0.1) return;
             lastPlay = now;
 
             const clone = soundAudio.cloneNode();
@@ -1378,12 +1378,16 @@
             subtree: true,
             attributeFilter: ['style']
         });
+
+        // Store observer on the element for future checks
+        puzzle._soundObserver = observer;
+
     }
 
     // ==================== TEXT REPLACEMENT ====================
 
     function replaceText() {
-       //console.log('Replacing text...');
+        //console.log('Replacing text...');
         const headers = document.querySelectorAll('td[column="header"]');
         headers.forEach(header => {
             let text = header.textContent;
@@ -1652,12 +1656,11 @@
                 applyInactiveBrightness(parseFloat(settings.inactiveBrightness.getValue()));
                 applyBorder(parseInt(settings.borderWidth.getValue()), settings.borderColor.getValue());
                 applyPuzzleDim(parseFloat(settings.puzzleDim.getValue()));
-                applyPuzzlePosition();
             }, 10);
         }
 
         document.addEventListener('keydown', handleUserInteraction);
-        document.addEventListener('click', handleUserInteraction);
+        document.addEventListener('pointerdown', handleUserInteraction);
     }
 
 
@@ -1665,6 +1668,10 @@
         try {
             await openDB();
             await restoreSettings();
+            mainObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
         } catch (error) {
             console.error('Failed to initialize:', error);
         }
@@ -1793,40 +1800,42 @@
 
     function preventMutationSpam(mutations) {
         let isSessionAvg = false;
-        
+
         for (const mutation of mutations) {
             const target = mutation.target.closest?.('tr');
             if (!target) continue;
-            
+
             if (target.getAttribute('avg') === 'session') {
                 isSessionAvg = true;
                 break;
             }
         }
-        
+
         if (isSessionAvg) {
             //console.log('Session average mutation — bypassing timer check');
             return false;
         }
-        
+
         for (const mutation of mutations) {
             const target = mutation.target.closest?.('tr');
             if (!target) continue;
-            
+
             if (target.getAttribute('avg') === '1') {
-               //console.log('probably timer running');
+                //console.log('probably timer running');
                 mainObserver.observe(document.body, { childList: true, subtree: true });
                 return true;
             }
         }
-        
+
         return false;
     }
 
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
         if (preventMutationSpam(mutations)) return;
-        updateButtonVisibility()
+        updateButtonVisibility();
+        initSound();
+        applyPuzzlePosition();
         removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
         if (getSetting('minimizeAvgs')) {
@@ -1871,11 +1880,6 @@
         }
 
         mainObserver.observe(document.body, { childList: true, subtree: true });
-    });
-
-    mainObserver.observe(document.body, {
-        childList: true,
-        subtree: true
     });
 
     // ==================== STATS IMPROVEMENTS ====================
@@ -3390,7 +3394,7 @@
 
                 const timeVal = timeText === 'DNF' ? DNF_TIME :
                     (timeText.includes(':') ? parseTimeToSeconds(timeText) :
-                    (isNaN(parseFloat(timeText)) ? DNF_TIME : parseFloat(timeText)));
+                        (isNaN(parseFloat(timeText)) ? DNF_TIME : parseFloat(timeText)));
                 const movesVal = (movesText === 'DNF' || isNaN(parseFloat(movesText))) ? DNF_MOVES : parseFloat(movesText);
 
                 let tpsVal;
@@ -4949,7 +4953,7 @@
 
         // Function to start stats when module is initialized
         function startStats() {
-             document.addEventListener('keydown', (e) => {
+            document.addEventListener('keydown', (e) => {
                 if (e.key === 'q' || e.key === 'Q') {
                     setTimeout(observeTables, 10);
                 }
@@ -4967,7 +4971,23 @@
         };
     }
 
-    // Initialize stats after a short delay to let the page load
-    setTimeout(initStats, 100);
+    function waitForElements(selectors, callback) {
+        if (selectors.every(s => document.querySelector(s))) {
+            callback();
+            return;
+        }
+        
+        const observer = new MutationObserver(() => {
+            if (selectors.every(s => document.querySelector(s))) {
+                observer.disconnect();
+                callback();
+            }
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    // Usage
+    waitForElements(['.filler', '.header'], initStats);
 
 })();
