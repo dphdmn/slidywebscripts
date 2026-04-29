@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.2.0
+// @version      3.3.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1315,7 +1315,6 @@
     }
 
     function convertBase9() {
-        //console.log("trying to convert");
         const puzzle = document.querySelector('.puzzle');
         if (!puzzle) return;
         const pieces = puzzle.querySelectorAll('.piece');
@@ -1604,9 +1603,6 @@
         // Restore base9
         const savedBase9 = getSetting('base9');
         base9Setting.setValue(savedBase9);
-        if (savedBase9) {
-            convertBase9();
-        }
 
         // Restore sound settings
         const savedSoundEnabled = getSetting('soundEnabled');
@@ -1799,29 +1795,12 @@
     // ==================== MAIN MUTATION OBSERVER ====================
 
     function preventMutationSpam(mutations) {
-        let isSessionAvg = false;
-
-        for (const mutation of mutations) {
-            const target = mutation.target.closest?.('tr');
-            if (!target) continue;
-
-            if (target.getAttribute('avg') === 'session') {
-                isSessionAvg = true;
-                break;
-            }
-        }
-
-        if (isSessionAvg) {
-            //console.log('Session average mutation — bypassing timer check');
-            return false;
-        }
-
+        if (mutations.length > 3) return false; //it's not JUST a timer running, probably important stuff
         for (const mutation of mutations) {
             const target = mutation.target.closest?.('tr');
             if (!target) continue;
 
             if (target.getAttribute('avg') === '1') {
-                //console.log('probably timer running');
                 mainObserver.observe(document.body, { childList: true, subtree: true });
                 return true;
             }
@@ -1833,11 +1812,13 @@
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
         if (preventMutationSpam(mutations)) return;
+        console.log('Mutations observed:', mutations.length);
         updateButtonVisibility();
         initSound();
         applyPuzzlePosition();
         removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
+
         if (getSetting('minimizeAvgs')) {
             replaceText();
             forcePuzzleLayout();
