@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.6.0
+// @version      3.7.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -85,7 +85,9 @@
         // New stats features
         statsGraphs: 'slidysim_dph_script_stats_graphs',
         statsAverages: 'slidysim_dph_script_stats_averages',
-        statsReplays: 'slidysim_dph_script_stats_replays'
+        statsReplays: 'slidysim_dph_script_stats_replays',
+        // Custom cursor
+        cursorEnabled: 'slidysim_dph_script_cursor_enabled'
     };
 
     function getSetting(key) {
@@ -106,7 +108,7 @@
     styleEl.textContent = `
         .slidy-controls { display: flex; align-items: center; gap: 8px; margin-left: 12px; position: relative; }
         .slidy-dropdown-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 8px; cursor: pointer; font-size: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
-        .slidy-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: rgba(30, 30, 30, 0.95); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; min-width: 300px; max-height: 85vh; overflow-y: auto; z-index: 10000; margin-top: 4px; }
+        .slidy-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: rgba(30, 30, 30, 0.95); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; min-width: 300px; max-height: 100vh; overflow-y: auto; z-index: 10000; margin-top: 4px; }
         .slidy-action-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; cursor: pointer; font-size: 12px; border-radius: 3px; width: 100%; margin-bottom: 8px; }
         .slidy-action-btn.danger { background: rgba(255,255,255,0.08); color: #ffdddd; }
         .slidy-section-label { color: #999; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
@@ -122,6 +124,7 @@
         .slidy-select:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
         .slidy-text-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; font-size: 11px; border-radius: 3px; width: 120px; }
         .slidy-file-input { display: none; }
+        .slidy-cursor-file-input { display: none; }
         .slidy-see-stats-btn { display: none; min-width: 140px; margin: 5px; padding: 6px 16px; background: rgba(60,60,60,0.9); color: white; border: 1px solid #666; cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .slidy-see-stats-btn:hover { background: rgba(80,80,80,0.95); border-color: #888; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
         .slidy-drag-handle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 36px; background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%); border: 1px solid #555; border-radius: 8px; cursor: move; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: #ddd; user-select: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); transition: transform 0.15s ease, box-shadow 0.15s ease; }
@@ -332,8 +335,15 @@
     const STORE_NAME = 'backgrounds';
     const BG_KEY = 'custom_bg';
 
+    // Cursor DB
+    const CURSOR_DB_NAME = 'SlidySimCursor';
+    const CURSOR_STORE_NAME = 'cursors';
+    const CURSOR_KEY = 'custom_cursor';
+
     let db = null;
+    let cursorDb = null;
     let currentBlobUrl = null;
+    let currentCursorBlobUrl = null;
 
     function openDB() {
         return new Promise((resolve, reject) => {
@@ -382,6 +392,55 @@
         });
     }
 
+    // ==================== CURSOR DATABASE ====================
+
+    function openCursorDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(CURSOR_DB_NAME, 1);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(CURSOR_STORE_NAME)) {
+                    db.createObjectStore(CURSOR_STORE_NAME);
+                }
+            };
+            request.onsuccess = (event) => {
+                cursorDb = event.target.result;
+                resolve(cursorDb);
+            };
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    function saveCursorToDB(blob) {
+        return new Promise((resolve, reject) => {
+            const transaction = cursorDb.transaction([CURSOR_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(CURSOR_STORE_NAME);
+            const request = store.put(blob, CURSOR_KEY);
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    function loadCursorFromDB() {
+        return new Promise((resolve, reject) => {
+            const transaction = cursorDb.transaction([CURSOR_STORE_NAME], 'readonly');
+            const store = transaction.objectStore(CURSOR_STORE_NAME);
+            const request = store.get(CURSOR_KEY);
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    function deleteCursorFromDB() {
+        return new Promise((resolve, reject) => {
+            const transaction = cursorDb.transaction([CURSOR_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(CURSOR_STORE_NAME);
+            const request = store.delete(CURSOR_KEY);
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
     // ==================== UI CREATION ====================
 
     const controls = document.createElement('div');
@@ -404,6 +463,16 @@
     removeBtn.textContent = '🗑️ Remove Background';
     removeBtn.className = 'slidy-action-btn';
     removeBtn.style.display = 'none';
+
+    // Cursor upload/remove buttons
+    const cursorUploadBtn = document.createElement('button');
+    cursorUploadBtn.textContent = '🖱️ Upload Cursor';
+    cursorUploadBtn.className = 'slidy-action-btn';
+
+    const cursorRemoveBtn = document.createElement('button');
+    cursorRemoveBtn.textContent = '🗑️ Remove Cursor';
+    cursorRemoveBtn.className = 'slidy-action-btn';
+    cursorRemoveBtn.style.display = 'none';
 
     // Section helper
     function createSectionLabel(text, marginTop = '6px') {
@@ -816,9 +885,20 @@
         type: 'checkbox',
         defaultValue: DEFAULT_CONFIG.hideHeaderDuringSolves,
         storageKey: STORAGE_KEYS.hideHeaderDuringSolves,
-        onChange: (val) => {}
+        onChange: (val) => { }
     });
     settings.hideHeaderDuringSolves = hideHeaderDuringSolvesSetting;
+
+    // Custom cursor enabled
+    const cursorEnabledSetting = createSetting({
+        id: 'cursor-enabled',
+        label: 'Custom cursor',
+        type: 'checkbox',
+        defaultValue: false,
+        storageKey: STORAGE_KEYS.cursorEnabled,
+        onChange: (val) => toggleCustomCursor(val)
+    });
+    settings.cursorEnabled = cursorEnabledSetting;
 
     // Stats: Graphs
     const statsGraphsSetting = createSetting({
@@ -878,6 +958,9 @@
     // Assemble dropdown menu
     dropdownMenu.appendChild(uploadBtn);
     dropdownMenu.appendChild(removeBtn);
+    dropdownMenu.appendChild(createSectionLabel('Cursor (⚠️ only active during solving):'));
+    dropdownMenu.appendChild(cursorUploadBtn);
+    dropdownMenu.appendChild(cursorRemoveBtn);
     dropdownMenu.appendChild(createSectionLabel('Opacity settings:'));
     dropdownMenu.appendChild(bgDimSetting.container);
     dropdownMenu.appendChild(bgBlurSetting.container);
@@ -907,6 +990,7 @@
     dropdownMenu.appendChild(minimizeAvgsSetting.container);
     dropdownMenu.appendChild(minimizeSessionsSetting.container);
     dropdownMenu.appendChild(hideHeaderDuringSolvesSetting.container);
+    dropdownMenu.appendChild(cursorEnabledSetting.container);
     dropdownMenu.appendChild(createSectionLabel('Stats:'));
     dropdownMenu.appendChild(statsAveragesSetting.container);
     dropdownMenu.appendChild(statsGraphsSetting.container);
@@ -1088,6 +1172,89 @@
     fileInput.accept = 'image/*';
     fileInput.className = 'slidy-file-input';
     document.body.appendChild(fileInput);
+
+    // Cursor file input
+    const cursorFileInput = document.createElement('input');
+    cursorFileInput.type = 'file';
+    cursorFileInput.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp,image/bmp,image/svg+xml,.cur,image/x-icon,image/vnd.microsoft.icon';
+    cursorFileInput.className = 'slidy-cursor-file-input';
+    document.body.appendChild(cursorFileInput);
+
+    // ==================== CURSOR FUNCTIONS ====================
+
+    function applyCustomCursor(blobUrl) {
+        // Remove previous cursor styles if they exist
+        const existingStyle = document.getElementById('custom-cursor-style');
+        if (existingStyle) {
+            existingStyle.remove();
+        }
+        if (!blobUrl) {
+            return; // Style already removed above, cursor returns to default
+        }
+
+        const MAX_SIZE = 128;
+        const cursorImg = new Image();
+
+        cursorImg.onload = function () {
+            const originalWidth = cursorImg.width;
+            const originalHeight = cursorImg.height;
+
+            if (originalWidth <= MAX_SIZE && originalHeight <= MAX_SIZE) {
+                createCursorStyle(blobUrl, originalWidth, originalHeight);
+                return;
+            }
+
+            const ratio = Math.min(MAX_SIZE / originalWidth, MAX_SIZE / originalHeight);
+            const scaledWidth = Math.round(originalWidth * ratio);
+            const scaledHeight = Math.round(originalHeight * ratio);
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            ctx.drawImage(cursorImg, 0, 0, scaledWidth, scaledHeight);
+
+            const scaledUrl = canvas.toDataURL('image/png');
+            createCursorStyle(scaledUrl, scaledWidth, scaledHeight);
+        };
+
+        function createCursorStyle(url, width, height) {
+            const hotspotX = Math.round(width / 2);
+            const hotspotY = Math.round(height / 2);
+
+            // Create a new style element
+            const style = document.createElement('style');
+            style.id = 'custom-cursor-style';
+            style.textContent = `
+                .focus-area {
+                    cursor: url('${url}') ${hotspotX} ${hotspotY}, not-allowed;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        cursorImg.onerror = function () {
+            console.error("Failed to preload cursor image");
+        };
+
+        cursorImg.src = blobUrl;
+    }
+
+    function toggleCustomCursor(enabled) {
+        if (enabled && currentCursorBlobUrl) {
+            applyCustomCursor(currentCursorBlobUrl);
+            document.body.classList.add('custom-cursor');
+        } else {
+            document.body.classList.remove('custom-cursor');
+            // Force remove the cursor style
+            const existingStyle = document.getElementById('custom-cursor-style');
+            if (existingStyle) {
+                existingStyle.remove();
+            }
+            // Also reset the cursor on html element directly
+            document.documentElement.style.cursor = 'auto';
+        }
+    }
 
     function applyBackground(blobUrl, dimAmount) {
         const mainContainer = document.querySelector('.main-content-container');
@@ -1515,6 +1682,52 @@
         }
     });
 
+    // Cursor upload/remove handlers
+    cursorUploadBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cursorFileInput.click();
+        
+    });
+
+    cursorRemoveBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+            if (currentCursorBlobUrl) {
+                URL.revokeObjectURL(currentCursorBlobUrl);
+                currentCursorBlobUrl = null;
+            }
+            await deleteCursorFromDB();
+            cursorRemoveBtn.style.display = 'none';
+            // Just turn off the visual cursor, don't change user's toggle preference
+            toggleCustomCursor(false);
+        } catch (error) {
+            console.error('Failed to remove cursor:', error);
+        }
+    });
+
+    cursorFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            if (currentCursorBlobUrl) {
+                URL.revokeObjectURL(currentCursorBlobUrl);
+            }
+            await saveCursorToDB(file);
+            currentCursorBlobUrl = URL.createObjectURL(file);
+            cursorRemoveBtn.style.display = 'block';
+            // Auto-enable cursor when uploaded (only if not already enabled)
+            if (!settings.cursorEnabled.getValue()) {
+                settings.cursorEnabled.setValue(true);
+            }
+            toggleCustomCursor(true);
+            // Reset input so same file can be uploaded again after removal
+            cursorFileInput.value = '';
+        } catch (error) {
+            console.error('Failed to save cursor:', error);
+            alert('Failed to save cursor. The file might be too large.');
+        }
+    });
+
     // ==================== INITIALIZATION ====================
 
     async function restoreSettings() {
@@ -1632,6 +1845,26 @@
             console.error('Failed to load background:', error);
         }
 
+        // Load cursor from IndexedDB
+        try {
+            const cursorBlob = await loadCursorFromDB();
+            if (cursorBlob) {
+                if (currentCursorBlobUrl) {
+                    URL.revokeObjectURL(currentCursorBlobUrl);
+                }
+                currentCursorBlobUrl = URL.createObjectURL(cursorBlob);
+                cursorRemoveBtn.style.display = 'block';
+                // Restore cursor enabled state
+                const savedCursorEnabled = getSetting('cursorEnabled');
+                cursorEnabledSetting.setValue(savedCursorEnabled);
+                if (savedCursorEnabled) {
+                    toggleCustomCursor(true);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load cursor:', error);
+        }
+
         removeModuleContainerBackground();
 
         function handleUserInteraction(e) {
@@ -1653,6 +1886,7 @@
     async function init() {
         try {
             await openDB();
+            await openCursorDB();
             await restoreSettings();
             mainObserver.observe(document.body, {
                 childList: true,
