@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.10.0
+// @version      3.10.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1305,7 +1305,7 @@
             style.id = 'custom-cursor-style';
             style.textContent = `
                 .focus-area {
-                    cursor: url('${url}') ${hotspotX} ${hotspotY}, not-allowed;
+                    cursor: url('${url}') ${hotspotX} ${hotspotY}, auto;
                 }
             `;
             document.head.appendChild(style);
@@ -2015,29 +2015,34 @@
             console.error('Failed to initialize:', error);
         }
     }
-
     function forcePuzzleLayout() {
-        const style = document.createElement('style');
-        style.textContent = `
-    .module-container[statistics-position="right"] .standard-container {
-      grid-template-columns: 1fr !important;
-      grid-template-areas: "a" !important;
-    }
+    // Check if this style has already been added
+    const existingStyle = document.querySelector('style[data-puzzle-layout]');
+    if (existingStyle) return;
 
-    .standard-stats-panel {
-      position: absolute !important;
-      right: 10px !important;
-      top: 10px !important;
-      z-index: -100 !important;
-      max-width: 250px !important;
-    }
+    const style = document.createElement('style');
+    style.setAttribute('data-puzzle-layout', 'true');
+    style.textContent = `
+        .module-container[statistics-position="right"] .standard-container {
+        grid-template-columns: 1fr !important;
+        grid-template-areas: "a" !important;
+        }
 
-    .standard-main-panel {
-      grid-area: a !important;
-      position: relative !important;
-    }
-  `;
-        document.head.appendChild(style);
+        .standard-stats-panel {
+        position: absolute !important;
+        right: 10px !important;
+        top: 10px !important;
+        max-width: 250px !important;
+        pointer-events: none;
+        user-select: none;
+        }
+
+        .standard-main-panel {
+        grid-area: a !important;
+        position: relative !important;
+        }
+    `;
+    document.head.appendChild(style);
     }
 
     function createSeeStatsButton() {
