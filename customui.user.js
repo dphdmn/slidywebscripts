@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.9.0
+// @version      3.10.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -21,7 +21,10 @@
 
     'use strict';
     document.head.insertAdjacentHTML('beforeend', '<style>.focus-area:focus-visible{outline:none!important}</style>'); //stupid outline fix
-
+    // Create and inject the CSS class
+    const style = document.createElement('style');
+    style.textContent = '.left-hack{position:fixed !important;bottom:0 !important;left:0 !important;max-width:200px}.left-hack td{font-size:12px !important;}.center-hack{position:fixed !important;bottom:0 !important;left:50% !important;transform:translateX(-50%) !important;font-size:12px !important;max-width:200px}.center-hack td{font-size:12px !important;}';
+    document.head.appendChild(style);
     let adjustButton = null;
     let toggleCenterButton = null;
     let isEditingMode = false;
@@ -1633,8 +1636,18 @@
     // ==================== TEXT REPLACEMENT ====================
 
     function replaceText() {
-        //console.log('Replacing text...');
-        const headers = document.querySelectorAll('td[column="header"]');
+        const container = document.querySelector('.stats-grid-container');
+        const standardStatsPanel = document.querySelector('.standard-stats-panel');
+        if (!container || !standardStatsPanel) return;
+        container.classList.remove('rounded');
+        if (isCornerMode) {
+            container.classList.toggle('left-hack', scrambled);
+        } else {
+            container.classList.toggle('center-hack', scrambled);
+        }
+        const thRow = container.querySelector('tr:has(th)');
+        if (thRow) thRow.remove();
+        const headers = container.querySelectorAll('td[column="header"]');
         headers.forEach(header => {
             let text = header.textContent;
             if (text.includes('Session average')) {
@@ -1644,14 +1657,27 @@
             header.textContent = text;
         });
 
-        document.querySelectorAll('tr[avg]').forEach(row => {
+        container.querySelectorAll('tr[avg]').forEach(row => {
             const avg = row.getAttribute('avg');
-            if (avg === 'session' || avg === '1') return;
-            const shouldHide = [...row.querySelectorAll('td')].some(cell => {
-                const text = cell.textContent.trim();
-                return text === 'DNF' || (text === '' && cell.getAttribute('column') !== 'header');
-            });
-            row.style.display = shouldHide ? 'none' : '';
+            if (scrambled) {
+                row.style.display = avg === '1' ? '' : 'none';
+                const tds = container.querySelectorAll('tr[avg="1"] td');
+                tds[0].textContent = tds[0].textContent.replace("Single", '');
+                if (tds[0].textContent === '') {
+                    tds[0].style.display = 'none';
+                }
+                tds[1].textContent = '';
+                tds[2].textContent = 'Ready';
+                tds[3].textContent = '';
+            } else {
+                container.querySelector('tr[avg="1"] td:first-child').style.display = '';
+                if (avg === 'session' || avg === '1') return;
+                const shouldHide = [...row.querySelectorAll('td')].some(cell => {
+                    const text = cell.textContent.trim();
+                    return text === 'DNF' || (text === '' && cell.getAttribute('column') !== 'header');
+                });
+                row.style.display = shouldHide ? 'none' : '';
+            }
         });
     }
 
