@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.8.0
+// @version      3.8.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -28,7 +28,7 @@
     let dragHandle = null;
     let scrambled = false;
     let positionApplied = false;
-    let isCornerMode = false;
+    let isCornerMode = true;
 
     // ==================== DEFAULT CONFIGURATION ====================
 
@@ -1203,12 +1203,12 @@
         if (!focusContainer) return;
         positionApplied = true;
 
-        settings.puzzleLeft.setValue(-125);
+        settings.puzzleLeft.setValue(0);
         settings.puzzleTop.setValue(0);
         
         setTimeout(() => {
             focusContainer.setAttribute('puzzle-position', 'center');
-            applyPuzzlePosition(true);
+            applyPuzzlePosition();
         }, 0);
     }
 
@@ -1409,7 +1409,7 @@
         });
     }
 
-    function applyPuzzlePosition(forceCenter = false) {
+    function applyPuzzlePosition() {
         const puzzleContainers = document.querySelectorAll('.puzzle-container');
         const focusContainer = document.querySelector('.focus-area');
         if (!focusContainer) {
