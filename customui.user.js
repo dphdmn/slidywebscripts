@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.3.1
+// @version      3.4.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -18,6 +18,7 @@
 
 (function () {
     'use strict';
+    document.head.insertAdjacentHTML('beforeend', '<style>.focus-area:focus-visible{outline:none!important}</style>'); //stupid outline fix
 
     let adjustButton = null;
     let isEditingMode = false;
@@ -1339,7 +1340,7 @@
     function initSound() {
         const puzzle = document.querySelector('.puzzle');
         const volume = getSetting('soundVolume');
-        
+
         if (!puzzle || (volume < 0.02)) {
             return;
         }
@@ -1659,7 +1660,6 @@
         document.addEventListener('pointerdown', handleUserInteraction);
     }
 
-
     async function init() {
         try {
             await openDB();
@@ -1809,10 +1809,128 @@
         return false;
     }
 
+    function detectPuzzleState(mutations) {
+        const firstMutation = mutations[0];
+        const isStyleReset = firstMutation.type === 'childList' &&
+            firstMutation.target.tagName === 'STYLE';
+
+        if (!isStyleReset) return "unknown";
+
+        // Check for session average update - the definitive marker of a finished solve
+        for (let i = 0; i < mutations.length; i++) {
+            const m = mutations[i];
+            if (m.type === 'childList' && m.target.tagName === 'TD') {
+                const addedText = m.addedNodes[0]?.textContent || '';
+                if (addedText.includes('Session')) {
+                    return "finished";
+                }
+            }
+        }
+
+        return "scrambled";
+    }
+
+    const logMutationDetails = (mutations) => {
+        console.clear();
+        mutations.forEach((m, i) => {
+            console.group(`🔍 Mutation ${i + 1}: ${m.type}`);
+
+            // Target info
+            if (m.target.nodeType === 1) { // Element node
+                console.log(`📍 Target element: <${m.target.tagName.toLowerCase()}${m.target.id ? ` id="${m.target.id}"` : ''}${m.target.className ? ` class="${m.target.className}"` : ''}>`);
+                console.log(`📦 Target outerHTML:`, m.target.outerHTML);
+            } else if (m.target.nodeType === 3) { // Text node
+                console.log(`📍 Target text node inside: <${m.target.parentElement?.tagName.toLowerCase()}${m.target.parentElement?.id ? ` id="${m.target.parentElement.id}"` : ''}${m.target.parentElement?.className ? ` class="${m.target.parentElement.className}"` : ''}>`);
+                console.log(`📝 Old text: "${m.oldValue || m.target.nodeValue}"`);
+                console.log(`📝 New text: "${m.target.nodeValue}"`);
+            }
+
+            // Added nodes with FULL HTML
+            if (m.addedNodes.length > 0) {
+                console.log(`✅ ADDED (${m.addedNodes.length} nodes):`);
+                Array.from(m.addedNodes).forEach((node, idx) => {
+                    if (node.nodeType === 1) { // Element
+                        console.log(`   ${idx + 1}. <${node.tagName.toLowerCase()}${node.id ? ` id="${node.id}"` : ''}${node.className ? ` class="${node.className}"` : ''}>`);
+                        console.log(`      Full HTML: ${node.outerHTML}`);
+                        console.log(`      Inner HTML: ${node.innerHTML}`);
+                        console.log(`      Attributes:`, Array.from(node.attributes).map(a => `${a.name}="${a.value}"`).join(', '));
+                    } else if (node.nodeType === 3) { // Text
+                        console.log(`   ${idx + 1}. Text: "${node.nodeValue}"`);
+                    }
+                });
+            }
+
+            // Removed nodes
+            if (m.removedNodes.length > 0) {
+                console.log(`❌ REMOVED (${m.removedNodes.length} nodes):`);
+                Array.from(m.removedNodes).forEach((node, idx) => {
+                    if (node.nodeType === 1) { // Element
+                        console.log(`   ${idx + 1}. <${node.tagName.toLowerCase()}${node.id ? ` id="${node.id}"` : ''}${node.className ? ` class="${node.className}"` : ''}>`);
+                        console.log(`      Full HTML: ${node.outerHTML}`);
+                    } else if (node.nodeType === 3) { // Text
+                        console.log(`   ${idx + 1}. Text: "${node.nodeValue}"`);
+                    }
+                });
+            }
+
+            // Attribute changes
+            if (m.type === 'attributes') {
+                console.log(`🔄 Attribute changed: ${m.attributeName}`);
+                console.log(`   Old value: "${m.oldValue}"`);
+                console.log(`   New value: "${m.target.getAttribute(m.attributeName)}"`);
+            }
+
+            console.groupEnd();
+        });
+    };
+
+    function toggleHeader(show = false) {
+        const header = document.querySelector('.header');
+        if (!header) return;
+
+        const mainContent = document.querySelector('.main-content-container');
+        const standardStatsPanel = document.querySelector('.standard-stats-panel');
+
+        if (!show) {
+            // Only hide if standardStatsPanel exists
+            if (standardStatsPanel) {
+                header.style.display = 'none';
+                if (mainContent) {
+                    mainContent.style.top = '0';
+                    mainContent.style.paddingTop = 'var(--header_height)';
+                }
+                if (standardStatsPanel) {
+                    standardStatsPanel.style.top = 'calc(var(--header_height) + 10px) !important';
+                }
+            }
+        } else {
+            // Showing
+            header.style.display = 'flex';
+            if (mainContent) {
+                mainContent.style.top = 'var(--header_height)';
+                mainContent.style.paddingTop = '0';
+            }
+            if (standardStatsPanel) {
+                standardStatsPanel.style.top = '0';
+            }
+        }
+    }
+
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
         if (preventMutationSpam(mutations)) return;
         //console.log('Mutations observed:', mutations.length);
+        //logMutationDetails(mutations);
+        const state = detectPuzzleState(mutations);
+        if (state === "scrambled") {
+            toggleHeader(false);
+            if (isEditingMode) {
+                exitEditMode();
+            }
+        } else if (state === "finished") {
+            toggleHeader(true);
+        }
+
         updateButtonVisibility();
         initSound();
         applyPuzzlePosition();
@@ -1898,7 +2016,7 @@
         const replaysEnabled = settings.statsReplays?.getValue() !== false;
 
         if (!graphsEnabled && !avgsEnabled && !replaysEnabled) {
-            console.log('All stats features disabled');
+           //console.log('All stats features disabled');
             return;
         }
 
@@ -4414,6 +4532,7 @@
 
             let values;
             if (category === 'time') {
+                4
                 values = validSolves.map(s => s.time);
             } else if (category === 'moves') {
                 values = validSolves.map(s => s.moves);
@@ -4957,14 +5076,14 @@
             callback();
             return;
         }
-        
+
         const observer = new MutationObserver(() => {
             if (selectors.every(s => document.querySelector(s))) {
                 observer.disconnect();
                 callback();
             }
         });
-        
+
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
