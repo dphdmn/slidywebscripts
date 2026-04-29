@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.0.0
+// @version      3.0.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -105,7 +105,7 @@
     styleEl.textContent = `
         .slidy-controls { display: flex; align-items: center; gap: 8px; margin-left: 12px; position: relative; }
         .slidy-dropdown-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 8px; cursor: pointer; font-size: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
-        .slidy-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: rgba(30, 30, 30, 0.95); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; min-width: 300px; max-height: 80vh; overflow-y: auto; z-index: 10000; margin-top: 4px; }
+        .slidy-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: rgba(30, 30, 30, 0.95); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; min-width: 300px; max-height: 81vh; overflow-y: auto; z-index: 10000; margin-top: 4px; }
         .slidy-action-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; cursor: pointer; font-size: 12px; border-radius: 3px; width: 100%; margin-bottom: 8px; }
         .slidy-action-btn.danger { background: rgba(255,255,255,0.08); color: #ffdddd; }
         .slidy-section-label { color: #999; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
