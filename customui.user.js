@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.7.0
+// @version      3.7.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -25,6 +25,7 @@
     let adjustButton = null;
     let isEditingMode = false;
     let dragHandle = null;
+    let scrambled = false;
 
     // ==================== DEFAULT CONFIGURATION ====================
 
@@ -1369,10 +1370,17 @@
         const leftVal = parseFloat(settings.puzzleLeft.getValue());
         const topVal = parseFloat(settings.puzzleTop.getValue());
 
+        
+        const addHeaderOffset = (settings.hideHeaderDuringSolves.getValue() && scrambled) ;
+  
         puzzleContainers.forEach(container => {
             container.style.position = 'relative';
             container.style.left = leftVal + 'px';
-            container.style.top = topVal + 'px';
+            if (addHeaderOffset) {
+                container.style.top = `calc(${topVal}px + var(--header_height) - 15px)`;
+            } else {
+                container.style.top = topVal + 'px';
+            }
         });
     }
 
@@ -2114,6 +2122,8 @@
 
         const mainContent = document.querySelector('.main-content-container');
         const standardStatsPanel = document.querySelector('.standard-stats-panel');
+        const standardMainPanel = document.querySelector('.standard-main-panel');
+        const moduleContainer = document.querySelector('.module-container');
 
         if (!show) {
             // Only hide if standardStatsPanel exists
@@ -2122,8 +2132,8 @@
                 if (mainContent) {
                     mainContent.style.top = '0';
                     mainContent.style.paddingTop = 'var(--header_height)';
-                }
-                if (standardStatsPanel) {
+                    moduleContainer.style.marginTop = 'calc(-2 * var(--header_height))';
+                    standardMainPanel.style.marginBottom = 'calc(-1 * var(--header_height))';
                     standardStatsPanel.style.top = 'calc(var(--header_height) + 10px) !important';
                 }
             }
@@ -2132,7 +2142,9 @@
             header.style.display = 'flex';
             if (mainContent) {
                 mainContent.style.top = 'var(--header_height)';
+                standardMainPanel.style.marginBottom = '0';
                 mainContent.style.paddingTop = '0';
+                moduleContainer.style.marginTop = '0';
             }
             if (standardStatsPanel) {
                 standardStatsPanel.style.top = '0';
@@ -2148,6 +2160,7 @@
         const state = detectPuzzleState(mutations);
         const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
         if (state === "scrambled") {
+            scrambled = true;
             if (hideHeaderDuringSolves) {
                 toggleHeader(false);
             }
@@ -2155,6 +2168,7 @@
                 exitEditMode();
             }
         } else if (state === "finished") {
+            scrambled = false;
             if (hideHeaderDuringSolves) {
                 toggleHeader(true);
             }
