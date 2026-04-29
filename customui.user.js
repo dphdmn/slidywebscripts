@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.5.0
+// @version      3.6.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -49,6 +49,7 @@
         soundDebounce: 40,
         minimizeAvgs: true,
         minimizeSessions: true,
+        hideHeaderDuringSolves: true,
         blankColorOpacity: 0,
         blankColor: '#000000',
         // New stats features
@@ -78,6 +79,7 @@
         soundDebounce: 'slidysim_dph_script_sound_debounce',
         minimizeAvgs: 'slidysim_dph_script_minimize_avgs',
         minimizeSessions: 'slidysim_dph_script_minimize_sessions',
+        hideHeaderDuringSolves: 'slidysim_dph_script_hide_header_during_solves',
         blankColorOpacity: 'slidysim_dph_script_blank_color_opacity',
         blankColor: 'slidysim_dph_script_blank_color',
         // New stats features
@@ -807,6 +809,17 @@
     });
     settings.minimizeSessions = minimizeSessionsSetting;
 
+    // Hide header during solves
+    const hideHeaderDuringSolvesSetting = createSetting({
+        id: 'hide-header-during-solves',
+        label: 'Hide header during solves',
+        type: 'checkbox',
+        defaultValue: DEFAULT_CONFIG.hideHeaderDuringSolves,
+        storageKey: STORAGE_KEYS.hideHeaderDuringSolves,
+        onChange: (val) => {}
+    });
+    settings.hideHeaderDuringSolves = hideHeaderDuringSolvesSetting;
+
     // Stats: Graphs
     const statsGraphsSetting = createSetting({
         id: 'stats-graphs',
@@ -893,6 +906,7 @@
     dropdownMenu.appendChild(createSectionLabel('Misc:'));
     dropdownMenu.appendChild(minimizeAvgsSetting.container);
     dropdownMenu.appendChild(minimizeSessionsSetting.container);
+    dropdownMenu.appendChild(hideHeaderDuringSolvesSetting.container);
     dropdownMenu.appendChild(createSectionLabel('Stats:'));
     dropdownMenu.appendChild(statsAveragesSetting.container);
     dropdownMenu.appendChild(statsGraphsSetting.container);
@@ -1600,6 +1614,10 @@
             minimizeSessions();
         }
 
+        // Restore hide header during solves
+        const savedHideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
+        hideHeaderDuringSolvesSetting.setValue(savedHideHeaderDuringSolves);
+
         // Load background from IndexedDB
         try {
             const blob = await loadFromDB();
@@ -1894,13 +1912,18 @@
         //console.log('Mutations observed:', mutations.length);
         //logMutationDetails(mutations);
         const state = detectPuzzleState(mutations);
+        const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
         if (state === "scrambled") {
-            toggleHeader(false);
+            if (hideHeaderDuringSolves) {
+                toggleHeader(false);
+            }
             if (isEditingMode) {
                 exitEditMode();
             }
         } else if (state === "finished") {
-            toggleHeader(true);
+            if (hideHeaderDuringSolves) {
+                toggleHeader(true);
+            }
         }
 
         updateButtonVisibility();
