@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.12.2
+// @version      3.13.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -20,6 +20,15 @@
 (function () {
 
     'use strict';
+    const __listenerStore = new WeakMap();
+    const originalAdd = EventTarget.prototype.addEventListener;
+
+    EventTarget.prototype.addEventListener = function (type, listener, options) {
+        if (this.matches?.('.focus-area') && type === 'mousemove') {
+            __listenerStore.set(this, listener);
+        }
+        return originalAdd.call(this, type, listener, options);
+    };
     document.head.insertAdjacentHTML('beforeend', '<style>.focus-area:focus-visible{outline:none!important}</style>'); //stupid outline fix
     // Create and inject the CSS class
     const style = document.createElement('style');
@@ -44,7 +53,7 @@
         puzzleTop: 0,
         borderWidth: 0,
         borderColor: '#000000',
-        gridsBorderWidth: 0,
+        gridsBorderWidth: 1,
         gridsBorderColor: '#000000',
         fontFamily: 'Arial',
         fontSize: 30,
@@ -63,7 +72,10 @@
         // New stats features
         statsGraphs: true,
         statsAverages: true,
-        statsReplays: true
+        statsReplays: true,
+        // Custom cursor
+        cursorEnabled: true,
+        rawHardwareInput: false
     };
 
     const STORAGE_KEYS = {
@@ -96,10 +108,11 @@
         statsAverages: 'slidysim_dph_script_stats_averages',
         statsReplays: 'slidysim_dph_script_stats_replays',
         // Custom cursor
-        cursorEnabled: 'slidysim_dph_script_cursor_enabled'
+        cursorEnabled: 'slidysim_dph_script_cursor_enabled',
+        rawHardwareInput: 'slidysim_dph_script_raw_hardware_input'
     };
 
-     // Settings that should be parsed as floats even if their defaults are integers
+    // Settings that should be parsed as floats even if their defaults are integers
     const FLOAT_SETTINGS = new Set([
         'puzzleDim',
         'bgDim',
@@ -130,43 +143,228 @@
     const styleEl = document.createElement('style');
     styleEl.textContent = `
         .slidy-controls { display: flex; align-items: center; gap: 8px; margin-left: 12px; position: relative; }
+
         .slidy-dropdown-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 8px; cursor: pointer; font-size: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
-        .slidy-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: rgba(30, 30, 30, 0.95); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; min-width: 300px; max-height: 100vh; overflow-y: auto; z-index: 10000; margin-top: 4px; }
-        .slidy-action-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; cursor: pointer; font-size: 12px; border-radius: 3px; width: 100%; margin-bottom: 8px; }
+
+        .slidy-dropdown-menu {
+            display: none;
+            position: fixed;
+            top: var(--header_height);
+            left: 0;
+            background: rgba(30, 30, 30, 0.95);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            padding: 12px;
+            min-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 10000;
+            margin-top: 4px;
+
+            display: none;
+            grid-template-columns: repeat(3, minmax(300px, 1fr));
+            gap: 12px;
+        }
+
+        .slidy-setting-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 8px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 6px;
+        }
+
+        .slidy-action-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 3px;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
         .slidy-action-btn.danger { background: rgba(255,255,255,0.08); color: #ffdddd; }
-        .slidy-section-label { color: #999; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
-        .slidy-section-label:first-of-type { margin-top: 0; }
-        .slidy-setting-container { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+
+        .slidy-section-label {
+            color: #aaa;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: 0.3px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: 3px;
+        }
+
+        .slidy-setting-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .slidy-setting-container.hidden { display: none; }
-        .slidy-setting-label { color: #ccc; font-size: 11px; min-width: 70px; }
-        .slidy-slider { width: 200px; height: 4px; cursor: pointer; }
-        .slidy-slider-value { color: #ccc; font-size: 11px; min-width: 35px; }
+
+        .slidy-setting-label {
+            color: #ccc;
+            font-size: 11px;
+            min-width: 80px;
+        }
+
+        .slidy-slider { width: 140px; height: 4px; cursor: pointer; }
+
+        .slidy-slider-value { color: #ccc; font-size: 11px; min-width: 30px; }
+
         .slidy-color-input { width: 24px; height: 20px; border: none; cursor: pointer; padding: 0; background: none; }
+
         .slidy-checkbox { width: 14px; height: 14px; cursor: pointer; margin: 0; }
-        .slidy-select { background: #1e1e1e; border: 1px solid #333; color: #eaeaea; padding: 4px 6px; font-size: 11px; border-radius: 4px; width: 200px; cursor: pointer; outline: none; transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease; }
+
+        .slidy-select {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #eaeaea;
+            padding: 4px 6px;
+            font-size: 11px;
+            border-radius: 4px;
+            width: 140px;
+            cursor: pointer;
+            outline: none;
+            transition: border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+
         .slidy-select:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
-        .slidy-text-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 4px; font-size: 11px; border-radius: 3px; width: 120px; }
+
+        .slidy-text-input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 2px 4px;
+            font-size: 11px;
+            border-radius: 3px;
+            width: 100px;
+        }
+
         .slidy-file-input { display: none; }
         .slidy-cursor-file-input { display: none; }
-        .slidy-see-stats-btn { display: none; min-width: 50px; margin-left: 5px; padding: 6px 16px; background: rgba(60,60,60,0.9); color: white; border: 1px solid #666; cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 6px; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .slidy-see-stats-btn:hover { background: rgba(80,80,80,0.95); border-color: #888; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-        .slidy-drag-handle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%); border: 1px solid #555; border-radius: 8px; cursor: move; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 50px !important; color: #ddd; user-select: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); transition: transform 0.15s ease, box-shadow 0.15s ease; }
-        .slidy-drag-handle:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15); }
-        .slidy-drag-handle:active { cursor: grabbing; transform: translate(-50%, -50%) scale(0.98); }
-        .slidy-version-span { font-weight: 700; padding-left: 6px; font-size: 11px; color: #999; letter-spacing: 0.5px; opacity: 0.8; }
-        /* Font Combobox Styles */
-        .slidy-font-combobox { position: relative; width: 200px; }
-        .slidy-font-input { background: #1e1e1e; border: 1px solid #333; color: #eaeaea; padding: 4px 8px; font-size: 11px; border-radius: 4px; width: 100%; box-sizing: border-box; outline: none; transition: border 0.15s ease, box-shadow 0.15s ease; }
-        .slidy-font-input:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
-        .slidy-font-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: rgba(30, 30, 30, 0.98); border: 1px solid #444; border-radius: 4px; max-height: 250px; overflow-y: auto; z-index: 10001; margin-top: 2px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+
+        .slidy-see-stats-btn {
+            display: none;
+            min-width: 50px;
+            margin-left: 5px;
+            padding: 6px 16px;
+            background: rgba(60,60,60,0.9);
+            color: white;
+            border: 1px solid #666;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .slidy-see-stats-btn:hover {
+            background: rgba(80,80,80,0.95);
+            border-color: #888;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .slidy-drag-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(180deg, rgba(70,70,70,0.95) 0%, rgba(50,50,50,0.95) 100%);
+            border: 1px solid #555;
+            border-radius: 8px;
+            cursor: move;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 50px !important;
+            color: #ddd;
+            user-select: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .slidy-drag-handle:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+
+        .slidy-drag-handle:active {
+            cursor: grabbing;
+            transform: translate(-50%, -50%) scale(0.98);
+        }
+
+        .slidy-version-span {
+            font-weight: 700;
+            padding-left: 6px;
+            font-size: 11px;
+            color: #999;
+            letter-spacing: 0.5px;
+            opacity: 0.8;
+        }
+
+        /* Font Combobox */
+        .slidy-font-combobox { position: relative; width: 140px; }
+
+        .slidy-font-input {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #eaeaea;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .slidy-font-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(30, 30, 30, 0.98);
+            border: 1px solid #444;
+            border-radius: 4px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 10001;
+            margin-top: 2px;
+        }
+
         .slidy-font-dropdown.open { display: block; }
-        .slidy-font-option { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 2px; }
-        .slidy-font-option:last-child { border-bottom: none; }
-        .slidy-font-option:hover, .slidy-font-option.highlighted { background: rgba(255,255,255,0.1); }
-        .slidy-font-option.selected { background: rgba(100, 150, 255, 0.2); }
-        .slidy-font-preview { font-size: 14px; color: #eaeaea; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .slidy-font-option {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .slidy-font-option:hover { background: rgba(255,255,255,0.1); }
+
+        .slidy-font-preview { font-size: 13px; color: #eaeaea; }
+
         .slidy-font-name { font-size: 10px; color: #888; }
-        .slidy-font-empty { padding: 10px; text-align: center; color: #666; font-size: 11px; }
+
+        .slidy-font-empty {
+            padding: 10px;
+            text-align: center;
+            color: #666;
+            font-size: 11px;
+        }
     `;
     document.head.appendChild(styleEl);
 
@@ -535,7 +733,7 @@
     // Background dim
     const bgDimSetting = createSetting({
         id: 'bg-dim',
-        label: 'Background',
+        label: 'Background Dim',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.bgDim,
         storageKey: STORAGE_KEYS.bgDim,
@@ -553,7 +751,7 @@
     // Background blur
     const bgBlurSetting = createSetting({
         id: 'bg-blur',
-        label: 'Blur',
+        label: 'Background Blur',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.bgBlur,
         storageKey: STORAGE_KEYS.bgBlur,
@@ -570,7 +768,7 @@
     // Puzzle dim
     const puzzleDimSetting = createSetting({
         id: 'puzzle-dim',
-        label: 'Puzzle',
+        label: 'Puzzle Opacity',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.puzzleDim,
         storageKey: STORAGE_KEYS.puzzleDim,
@@ -611,7 +809,7 @@
     // UI opacity
     const uiOpacitySetting = createSetting({
         id: 'ui-opacity',
-        label: 'UI',
+        label: 'UI Opacity',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.uiOpacity,
         storageKey: STORAGE_KEYS.uiOpacity,
@@ -656,7 +854,7 @@
     // Border width
     const borderWidthSetting = createSetting({
         id: 'border-width',
-        label: 'Border',
+        label: 'Puzzle Border',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.borderWidth,
         storageKey: STORAGE_KEYS.borderWidth,
@@ -1112,7 +1310,7 @@
     // Inactive grids brightness
     const inactiveBrightnessSetting = createSetting({
         id: 'inactive-brightness',
-        label: 'Inactive Brightness',
+        label: 'Grids Opacity',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.inactiveBrightness,
         storageKey: STORAGE_KEYS.inactiveBrightness,
@@ -1158,7 +1356,7 @@
     // Sound volume
     const soundVolumeSetting = createSetting({
         id: 'sound-volume',
-        label: 'Volume',
+        label: 'Move sounds',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.soundVolume,
         storageKey: STORAGE_KEYS.soundVolume,
@@ -1177,7 +1375,7 @@
     // Sound debounce
     const soundDebounceSetting = createSetting({
         id: 'sound-debounce',
-        label: 'Debounce',
+        label: 'Sound frequency',
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.soundDebounce,
         storageKey: STORAGE_KEYS.soundDebounce,
@@ -1246,7 +1444,7 @@
     // Custom cursor enabled
     const cursorEnabledSetting = createSetting({
         id: 'cursor-enabled',
-        label: 'Custom cursor',
+        label: 'Enable cursor',
         type: 'checkbox',
         defaultValue: false,
         storageKey: STORAGE_KEYS.cursorEnabled,
@@ -1254,10 +1452,27 @@
     });
     settings.cursorEnabled = cursorEnabledSetting;
 
+    // Raw Hardware Input
+    const rawHardwareInputSetting = createSetting({
+        id: 'raw-hardware-input',
+        label: 'Raw Hardware Input',
+        type: 'checkbox',
+        checked: DEFAULT_CONFIG.rawHardwareInput,
+        storageKey: STORAGE_KEYS.rawHardwareInput,
+        onChange: (val) => {
+            if (val) {
+                overwriteInputs();
+            } else {
+                restoreInputs();
+            }
+        }
+    });
+    settings.rawHardwareInput = rawHardwareInputSetting;
+
     // Stats: Graphs
     const statsGraphsSetting = createSetting({
         id: 'stats-graphs',
-        label: '(requires stats) Graphs',
+        label: 'Graphs (requires Stats module)',
         type: 'checkbox',
         checked: DEFAULT_CONFIG.statsGraphs,
         storageKey: STORAGE_KEYS.statsGraphs,
@@ -1272,7 +1487,7 @@
     // Stats: Averages
     const statsAveragesSetting = createSetting({
         id: 'stats-averages',
-        label: 'Stats module',
+        label: 'Main Stats module (averages, session stats)',
         type: 'checkbox',
         checked: DEFAULT_CONFIG.statsAverages,
         storageKey: STORAGE_KEYS.statsAverages,
@@ -1309,49 +1524,104 @@
         if (ok) resetAllSettings();
     });
 
-    // Assemble dropdown menu
-    dropdownMenu.appendChild(uploadBtn);
-    dropdownMenu.appendChild(removeBtn);
-    dropdownMenu.appendChild(createSectionLabel('Cursor (⚠️ only active during solving):'));
-    dropdownMenu.appendChild(cursorUploadBtn);
-    dropdownMenu.appendChild(cursorRemoveBtn);
-    dropdownMenu.appendChild(createSectionLabel('Opacity settings:'));
-    dropdownMenu.appendChild(bgDimSetting.container);
-    dropdownMenu.appendChild(bgBlurSetting.container);
-    dropdownMenu.appendChild(puzzleDimSetting.container);
-    dropdownMenu.appendChild(blankColorOpacitySetting.container);
-    dropdownMenu.appendChild(blankColorSetting.container);
-    dropdownMenu.appendChild(uiOpacitySetting.container);
-    //dropdownMenu.appendChild(createSectionLabel('Puzzle Position:'));
-    dropdownMenu.appendChild(puzzleLeftSetting.container); puzzleLeftSetting.container.style.display = 'none';
-    dropdownMenu.appendChild(puzzleTopSetting.container); puzzleTopSetting.container.style.display = 'none';
-    dropdownMenu.appendChild(createSectionLabel('Border settings:'));
-    dropdownMenu.appendChild(borderWidthSetting.container);
-    dropdownMenu.appendChild(createSectionLabel('Font settings:'));
-    dropdownMenu.appendChild(fontFamilySetting.container);
-    dropdownMenu.appendChild(fontSizeSetting.container);
-    dropdownMenu.appendChild(boldSetting.container);
-    dropdownMenu.appendChild(createSectionLabel('Grid settings:'));
-    dropdownMenu.appendChild(inactiveBrightnessSetting.container);
-    dropdownMenu.appendChild(gridsBorderWidthSetting.container);
-    dropdownMenu.appendChild(createSectionLabel('Puzzle settings:'));
-    dropdownMenu.appendChild(base9Setting.container);
-    dropdownMenu.appendChild(createSectionLabel('Sound settings:'));
-    dropdownMenu.appendChild(soundEnableSetting.container);
-    dropdownMenu.appendChild(soundVolumeSetting.container);
-    dropdownMenu.appendChild(soundDebounceSetting.container);
-    dropdownMenu.appendChild(createSectionLabel('Misc:'));
-    dropdownMenu.appendChild(minimizeAvgsSetting.container);
-    dropdownMenu.appendChild(minimizeSessionsSetting.container);
-    dropdownMenu.appendChild(hideHeaderDuringSolvesSetting.container);
-    dropdownMenu.appendChild(puzzleAlwaysInCenterSetting.container);
-    dropdownMenu.appendChild(cursorEnabledSetting.container);
-    dropdownMenu.appendChild(createSectionLabel('Stats:'));
-    dropdownMenu.appendChild(statsAveragesSetting.container);
-    dropdownMenu.appendChild(statsGraphsSetting.container);
-    dropdownMenu.appendChild(statsReplaysSetting.container);
-    dropdownMenu.appendChild(createSectionLabel('⚠️Some changes require a refresh to apply'));
-    dropdownMenu.appendChild(resetBtn);
+    // helper to create a group (column)
+    function createGroup(title, elements) {
+        const group = document.createElement('div');
+        group.className = 'slidy-setting-group';
+
+        if (title) {
+            group.appendChild(createSectionLabel(title));
+        }
+
+        elements.forEach(el => {
+            if (el) group.appendChild(el);
+        });
+
+        return group;
+    }
+
+    // ------------------------------
+    // 1. CREATE GROUPS FIRST
+    // ------------------------------
+
+    const bgGroup = createGroup('Background settings', [
+        uploadBtn,
+        removeBtn,
+        bgDimSetting.container,
+        bgBlurSetting.container
+    ]);
+
+    const cursorGroup = createGroup('Cursor settings', [
+        cursorUploadBtn,
+        cursorRemoveBtn,
+        cursorEnabledSetting.container,
+    ]);
+
+    const opacityGroup = createGroup('Opacity settings', [
+        uiOpacitySetting.container,
+        puzzleDimSetting.container,
+        inactiveBrightnessSetting.container,
+        blankColorOpacitySetting.container,
+        blankColorSetting.container
+    ]);
+
+    const hiddenPuzzlePosGroup = createGroup(null, [
+        puzzleLeftSetting.container,
+        puzzleTopSetting.container
+    ]);
+    hiddenPuzzlePosGroup.style.display = 'none';
+
+    const borderGroup = createGroup('Border settings', [
+        borderWidthSetting.container,
+        gridsBorderWidthSetting.container
+    ]);
+
+    const fontGroup = createGroup('Font settings', [
+        fontFamilySetting.container,
+        fontSizeSetting.container,
+        boldSetting.container
+    ]);
+
+
+    const soundGroup = createGroup('Experimental settings (⚠️ May cause lag)', [
+        base9Setting.container,
+        soundEnableSetting.container,
+        soundVolumeSetting.container,
+        soundDebounceSetting.container,
+        rawHardwareInputSetting.container
+    ]);
+
+    const miscGroup = createGroup('Simplify layout', [
+        puzzleAlwaysInCenterSetting.container,
+        minimizeAvgsSetting.container,
+        minimizeSessionsSetting.container,
+        hideHeaderDuringSolvesSetting.container
+    ]);
+
+    const statsGroup = createGroup('Stats settings', [
+        statsAveragesSetting.container,
+        statsGraphsSetting.container,
+        statsReplaysSetting.container
+    ]);
+
+    const resetGroup = createGroup("Manage settings", [
+        resetBtn
+    ]);
+
+    // ------------------------------
+    // 2. ASSEMBLE DROPDOWN
+    // ------------------------------
+
+    dropdownMenu.appendChild(bgGroup);
+    dropdownMenu.appendChild(cursorGroup);
+    dropdownMenu.appendChild(opacityGroup);
+    dropdownMenu.appendChild(hiddenPuzzlePosGroup);
+    dropdownMenu.appendChild(borderGroup);
+    dropdownMenu.appendChild(fontGroup);
+    dropdownMenu.appendChild(soundGroup);
+    dropdownMenu.appendChild(miscGroup);
+    dropdownMenu.appendChild(statsGroup);
+    dropdownMenu.appendChild(resetGroup);
 
     controls.appendChild(dropdownBtn);
     controls.appendChild(dropdownMenu);
@@ -1359,7 +1629,7 @@
     // Toggle dropdown
     dropdownBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+        dropdownMenu.style.display = dropdownMenu.style.display === 'grid' ? 'none' : 'grid';
     });
 
     // Close dropdown when clicking outside
@@ -1795,6 +2065,30 @@
 
             container.dataset.wheelListener = 'true';
         }
+    }
+
+    function overwriteInputs() {
+        const element = document.querySelector('.focus-area');
+        if (!element) return;
+
+        console.log("overwriting inputs");
+
+        const listener = __listenerStore.get(element);
+        if (!listener) return;
+
+        element.removeEventListener('mousemove', listener, false);
+        element.addEventListener('pointerrawupdate', listener, false);
+    }
+
+    function restoreInputs() {
+        const element = document.querySelector('.focus-area');
+        if (!element) return;
+
+        const listener = __listenerStore.get(element);
+        if (!listener) return;
+
+        element.removeEventListener('pointerrawupdate', listener, false);
+        element.addEventListener('mousemove', listener, false);
     }
 
     function applyPuzzlePosition() {
@@ -2347,6 +2641,11 @@
                 applyBorder(parseInt(settings.borderWidth.getValue()), settings.borderColor.getValue());
                 applyPuzzleDim(parseFloat(settings.puzzleDim.getValue()));
                 addHorizontalScroll();
+                if (settings.rawHardwareInput.getValue()) {
+                    overwriteInputs();
+                } else {
+                    restoreInputs();
+                }
             }, 10);
         }
 
