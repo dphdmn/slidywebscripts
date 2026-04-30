@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.10.1
+// @version      3.11.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -46,7 +46,7 @@
         borderColor: '#000000',
         gridsBorderWidth: 0,
         gridsBorderColor: '#000000',
-        fontFamily: 'inherit',
+        fontFamily: 'Arial',
         fontSize: 30,
         bold: false,
         inactiveBrightness: 0.3,
@@ -140,6 +140,19 @@
         .slidy-drag-handle:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15); }
         .slidy-drag-handle:active { cursor: grabbing; transform: translate(-50%, -50%) scale(0.98); }
         .slidy-version-span { font-weight: 700; padding-left: 6px; font-size: 11px; color: #999; letter-spacing: 0.5px; opacity: 0.8; }
+        /* Font Combobox Styles */
+        .slidy-font-combobox { position: relative; width: 200px; }
+        .slidy-font-input { background: #1e1e1e; border: 1px solid #333; color: #eaeaea; padding: 4px 8px; font-size: 11px; border-radius: 4px; width: 100%; box-sizing: border-box; outline: none; transition: border 0.15s ease, box-shadow 0.15s ease; }
+        .slidy-font-input:focus { border: 1px solid #666; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
+        .slidy-font-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: rgba(30, 30, 30, 0.98); border: 1px solid #444; border-radius: 4px; max-height: 250px; overflow-y: auto; z-index: 10001; margin-top: 2px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .slidy-font-dropdown.open { display: block; }
+        .slidy-font-option { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 2px; }
+        .slidy-font-option:last-child { border-bottom: none; }
+        .slidy-font-option:hover, .slidy-font-option.highlighted { background: rgba(255,255,255,0.1); }
+        .slidy-font-option.selected { background: rgba(100, 150, 255, 0.2); }
+        .slidy-font-preview { font-size: 14px; color: #eaeaea; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .slidy-font-name { font-size: 10px; color: #888; }
+        .slidy-font-empty { padding: 10px; text-align: center; color: #666; font-size: 11px; }
     `;
     document.head.appendChild(styleEl);
 
@@ -670,6 +683,30 @@
     settings.gridsBorderColor = gridsBorderColorSetting;
     gridsBorderWidthSetting.container.appendChild(gridsBorderColorSetting.input);
 
+    // ==================== FONT ACCESS FUNCTIONS ====================
+
+    // Local Font Access API - gets system fonts using unsafeWindow
+    async function getLocalFonts() {
+        try {
+            // Check if API is available in unsafeWindow (required for userscripts)
+            if (!unsafeWindow.queryLocalFonts) {
+                return null;
+            }
+            const fonts = await unsafeWindow.queryLocalFonts();
+            // Extract unique font family names, filter out duplicates and empty names
+            const fontFamilies = [...new Set(
+                fonts
+                    .map(f => f.family)
+                    .filter(f => f && f.trim().length > 0)
+                    .sort((a, b) => a.localeCompare(b))
+            )];
+            return fontFamilies;
+        } catch (error) {
+            // User denied permission or API error - silently fall back
+            return null;
+        }
+    }
+
     function isFontAvailable(font) {
         const text = "mmmmmmmmmmlli";
         const size = "72px";
@@ -686,7 +723,8 @@
         return width !== baseline;
     }
 
-    const allFonts = [
+    // Default fallback fonts (used when Local Font Access is not available/denied)
+    const defaultFontList = [
         'system-ui', 'Arial', 'Verdana', 'Tahoma', 'Trebuchet MS',
         'Times New Roman', 'Georgia', 'Garamond', 'Courier New', 'Comic Sans MS',
         'Calibri', 'Cambria', 'Candara', 'Consolas', 'Constantia', 'Corbel',
@@ -713,36 +751,310 @@
         'Wingdings'
     ];
 
-    const fontOptions = [
-        { value: 'custom', label: 'Custom...' },
-        { value: 'inherit', label: 'Default' },
-        ...allFonts
-            .filter(font => isFontAvailable(font))
-            .map(font => ({ value: font, label: font }))
-    ];
+    // Store fonts globally for the combobox
+    let availableFonts = ['Arial']; // Start with just Arial
+    let localFontsLoaded = false;
+    let fontLoadingAttempted = false;
 
-    // Font family
-    const fontFamilySetting = createSetting({
+    // Load fonts from user's system - called on first user interaction
+    async function loadUserFonts() {
+        if (fontLoadingAttempted) return; // Only try once
+        fontLoadingAttempted = true;
+
+        // Try to get local fonts first
+        const localFonts = await getLocalFonts();
+
+        if (localFonts && localFonts.length > 0) {
+            // Use local fonts - no need to merge with defaults since system fonts cover everything
+            availableFonts = localFonts;
+            localFontsLoaded = true;
+        } else {
+            // Fall back to default font list, filtered for availability
+            availableFonts = defaultFontList.filter(font => isFontAvailable(font));
+            localFontsLoaded = false;
+        }
+    }
+
+    // ==================== SEARCHABLE FONT COMBOBOX ====================
+
+    function createFontCombobox(config) {
+        const {
+            id,
+            label,
+            defaultValue,
+            storageKey,
+            onChange
+        } = config;
+
+        const container = document.createElement('div');
+        container.className = 'slidy-setting-container';
+
+        const labelEl = document.createElement('span');
+        labelEl.textContent = label + ':';
+        labelEl.className = 'slidy-setting-label';
+        container.appendChild(labelEl);
+
+        const comboboxWrapper = document.createElement('div');
+        comboboxWrapper.className = 'slidy-font-combobox';
+
+        // Input field
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'slidy-font-input';
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-haspopup', 'listbox');
+        input.setAttribute('aria-controls', id + '-listbox');
+        input.placeholder = 'Search fonts...';
+
+        // Dropdown list
+        const dropdown = document.createElement('div');
+        dropdown.className = 'slidy-font-dropdown';
+        dropdown.setAttribute('role', 'listbox');
+        dropdown.id = id + '-listbox';
+
+        comboboxWrapper.appendChild(input);
+        comboboxWrapper.appendChild(dropdown);
+        container.appendChild(comboboxWrapper);
+
+        // State
+        let fonts = ['Arial']; // Start with just Arial
+        let filteredFonts = fonts;
+        let highlightedIndex = -1;
+        let selectedFont = null;
+        let debounceTimer = null;
+        let fontsLoaded = false;
+
+        // Initialize - just set initial value, don't load fonts yet
+        async function init() {
+            // Use current availableFonts (initially just Arial)
+            fonts = [...availableFonts];
+            filteredFonts = fonts;
+            renderDropdown();
+
+            // Set initial value
+            const savedValue = getSetting('fontFamily');
+            if (savedValue && savedValue !== 'custom') {
+                selectFont(savedValue, false);
+            } else if (savedValue === 'inherit') {
+                selectFont('Default', false);
+            }
+        }
+
+        // Load fonts on first user interaction
+        async function ensureFontsLoaded() {
+            if (fontsLoaded) return;
+
+            fontsLoaded = true;
+            // Trigger font loading
+            await loadUserFonts();
+
+            // Update the fonts list with newly loaded fonts
+            fonts = [...availableFonts];
+            filterFonts(input.value);
+        }
+
+        // Render dropdown options
+        function renderDropdown() {
+            dropdown.innerHTML = '';
+
+            if (filteredFonts.length === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'slidy-font-empty';
+                emptyMsg.textContent = 'No fonts found';
+                dropdown.appendChild(emptyMsg);
+                return;
+            }
+
+            filteredFonts.forEach((font, index) => {
+                const option = document.createElement('div');
+                option.className = 'slidy-font-option';
+                option.setAttribute('role', 'option');
+                option.setAttribute('data-font', font);
+
+                if (index === highlightedIndex) {
+                    option.classList.add('highlighted');
+                }
+                if (selectedFont === font) {
+                    option.classList.add('selected');
+                }
+
+                // Preview with numbers in the actual font
+                const preview = document.createElement('div');
+                preview.className = 'slidy-font-preview';
+                preview.textContent = '0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15';
+                preview.style.fontFamily = `"${font}", sans-serif`;
+
+                // Font name label
+                const name = document.createElement('div');
+                name.className = 'slidy-font-name';
+                name.textContent = font;
+
+                option.appendChild(preview);
+                option.appendChild(name);
+
+                // Click to select
+                option.addEventListener('click', () => {
+                    selectFont(font, true);
+                });
+
+                dropdown.appendChild(option);
+            });
+        }
+
+        // Filter fonts based on search query
+        function filterFonts(query) {
+            if (!query || query.trim() === '') {
+                filteredFonts = fonts;
+            } else {
+                const lowerQuery = query.toLowerCase();
+                filteredFonts = fonts.filter(font =>
+                    font.toLowerCase().includes(lowerQuery)
+                );
+            }
+            highlightedIndex = -1;
+            renderDropdown();
+        }
+
+        // Select a font
+        function selectFont(font, notify) {
+            selectedFont = font;
+            input.value = font;
+            input.style.fontFamily = font === 'Default' ? 'inherit' : `"${font}", sans-serif`;
+            dropdown.classList.remove('open');
+            input.setAttribute('aria-expanded', 'false');
+
+            if (notify && onChange) {
+                const value = font === 'Default' ? 'inherit' : font;
+                localStorage.setItem(storageKey, value);
+                onChange(value);
+            }
+        }
+
+        // Debounced filter
+        function debouncedFilter(query) {
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
+            debounceTimer = setTimeout(() => {
+                filterFonts(query);
+            }, 150);
+        }
+
+        // Input event
+        input.addEventListener('input', (e) => {
+            debouncedFilter(e.target.value);
+            dropdown.classList.add('open');
+            input.setAttribute('aria-expanded', 'true');
+        });
+
+        // Focus event - show dropdown and load fonts on first interaction
+        input.addEventListener('focus', async () => {
+            await ensureFontsLoaded();
+            dropdown.classList.add('open');
+            input.setAttribute('aria-expanded', 'true');
+            filterFonts(input.value);
+        });
+
+        // Blur event - close dropdown (with delay to allow click)
+        input.addEventListener('blur', (e) => {
+            setTimeout(() => {
+                if (!dropdown.contains(document.activeElement)) {
+                    dropdown.classList.remove('open');
+                    input.setAttribute('aria-expanded', 'false');
+                }
+            }, 150);
+        });
+
+        // Keyboard navigation
+        input.addEventListener('keydown', (e) => {
+            const options = dropdown.querySelectorAll('.slidy-font-option');
+
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (filteredFonts.length > 0) {
+                        highlightedIndex = Math.min(highlightedIndex + 1, filteredFonts.length - 1);
+                        renderDropdown();
+                        scrollToHighlighted();
+                    }
+                    break;
+
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (filteredFonts.length > 0) {
+                        highlightedIndex = Math.max(highlightedIndex - 1, 0);
+                        renderDropdown();
+                        scrollToHighlighted();
+                    }
+                    break;
+
+                case 'Enter':
+                    e.preventDefault();
+                    if (highlightedIndex >= 0 && filteredFonts[highlightedIndex]) {
+                        selectFont(filteredFonts[highlightedIndex], true);
+                    }
+                    break;
+
+                case 'Escape':
+                    e.preventDefault();
+                    dropdown.classList.remove('open');
+                    input.setAttribute('aria-expanded', 'false');
+                    input.blur();
+                    break;
+
+                case 'Tab':
+                    dropdown.classList.remove('open');
+                    input.setAttribute('aria-expanded', 'false');
+                    break;
+            }
+        });
+
+        // Scroll highlighted option into view
+        function scrollToHighlighted() {
+            const options = dropdown.querySelectorAll('.slidy-font-option');
+            if (options[highlightedIndex]) {
+                options[highlightedIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        // Initialize
+        init();
+
+        return {
+            container,
+            input,
+            getValue: () => {
+                const value = selectedFont === 'Default' ? 'inherit' : selectedFont;
+                return value;
+            },
+            setValue: (val) => {
+                if (val === 'inherit' || val === 'Default') {
+                    selectFont('Default', false);
+                } else if (val === 'custom') {
+                    // Handle custom font prompt
+                    const customFont = prompt('Enter font family name: (it must exist on your system, otherwise default will be loaded)', localStorage.getItem('slidysim_dph_script_font_family_custom') || 'Arial');
+                    if (customFont) {
+                        localStorage.setItem('slidysim_dph_script_font_family_custom', customFont);
+                        selectFont(customFont, true);
+                        if (onChange) onChange(customFont);
+                    }
+                } else if (val && fonts.includes(val)) {
+                    selectFont(val, false);
+                }
+            }
+        };
+    }
+
+    // Font family - using searchable combobox
+    const fontFamilySetting = createFontCombobox({
         id: 'font-family',
         label: 'Font Family',
-        type: 'select',
         defaultValue: DEFAULT_CONFIG.fontFamily,
         storageKey: STORAGE_KEYS.fontFamily,
-        options: fontOptions,
         onChange: (val) => {
-            if (val === 'custom') {
-                const customFont = prompt('Enter font family name: (it must exist on your system, otherwise default will be loaded)', localStorage.getItem('slidysim_dph_script_font_family_custom') || 'Arial');
-                if (customFont) {
-                    localStorage.setItem('slidysim_dph_script_font_family_custom', customFont);
-                    applyFontFamily(customFont);
-                } else {
-                    fontFamilySetting.setValue('inherit');
-                    localStorage.setItem(STORAGE_KEYS.fontFamily, 'inherit');
-                    applyFontFamily('inherit');
-                }
-            } else {
-                applyFontFamily(val);
-            }
+            applyFontFamily(val);
         }
     });
     settings.fontFamily = fontFamilySetting;
@@ -986,9 +1298,9 @@
     dropdownMenu.appendChild(blankColorOpacitySetting.container);
     dropdownMenu.appendChild(blankColorSetting.container);
     dropdownMenu.appendChild(uiOpacitySetting.container);
-    dropdownMenu.appendChild(createSectionLabel('Puzzle Position:'));
-    dropdownMenu.appendChild(puzzleLeftSetting.container);
-    dropdownMenu.appendChild(puzzleTopSetting.container);
+    //dropdownMenu.appendChild(createSectionLabel('Puzzle Position:'));
+    dropdownMenu.appendChild(puzzleLeftSetting.container); puzzleLeftSetting.container.style.display = 'none';
+    dropdownMenu.appendChild(puzzleTopSetting.container); puzzleTopSetting.container.style.display = 'none';
     dropdownMenu.appendChild(createSectionLabel('Border settings:'));
     dropdownMenu.appendChild(borderWidthSetting.container);
     dropdownMenu.appendChild(createSectionLabel('Font settings:'));
@@ -1440,6 +1752,25 @@
                 element.style.backgroundColor = `rgba(35, 35, 35, ${opacity})`;
             }
         });
+    }
+
+    function addHorizontalScroll() {
+        const container = document.querySelector('.focus-container');
+        if (!container) return;
+        // Only add if we haven't already
+        if (!container.dataset.wheelListener) {
+            container.addEventListener('wheel', (e) => {
+                const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
+                const hasVerticalScroll = container.scrollHeight > container.clientHeight;
+
+                if (hasHorizontalScroll && (!hasVerticalScroll || e.altKey)) {
+                    e.preventDefault();
+                    container.scrollLeft += e.deltaY;
+                }
+            }, { passive: false });
+
+            container.dataset.wheelListener = 'true';
+        }
     }
 
     function applyPuzzlePosition() {
@@ -1995,6 +2326,7 @@
                 applyInactiveBrightness(parseFloat(settings.inactiveBrightness.getValue()));
                 applyBorder(parseInt(settings.borderWidth.getValue()), settings.borderColor.getValue());
                 applyPuzzleDim(parseFloat(settings.puzzleDim.getValue()));
+                addHorizontalScroll();
             }, 10);
         }
 
@@ -2016,13 +2348,13 @@
         }
     }
     function forcePuzzleLayout() {
-    // Check if this style has already been added
-    const existingStyle = document.querySelector('style[data-puzzle-layout]');
-    if (existingStyle) return;
+        // Check if this style has already been added
+        const existingStyle = document.querySelector('style[data-puzzle-layout]');
+        if (existingStyle) return;
 
-    const style = document.createElement('style');
-    style.setAttribute('data-puzzle-layout', 'true');
-    style.textContent = `
+        const style = document.createElement('style');
+        style.setAttribute('data-puzzle-layout', 'true');
+        style.textContent = `
         .module-container[statistics-position="right"] .standard-container {
         grid-template-columns: 1fr !important;
         grid-template-areas: "a" !important;
@@ -2042,7 +2374,7 @@
         position: relative !important;
         }
     `;
-    document.head.appendChild(style);
+        document.head.appendChild(style);
     }
 
     function createSeeStatsButton() {
