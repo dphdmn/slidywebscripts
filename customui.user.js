@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.2
+// @version      3.24.3
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3174,8 +3174,8 @@
 
     function enterZenMode() {
         const mainContent = document.querySelector('.focus-container');
-        enterFullscreen(document.documentElement);
         if (!mainContent) return;
+        enterFullscreen(document.documentElement);
         toggleHeader(false);
         replaceText();
         isZenMode = true;
