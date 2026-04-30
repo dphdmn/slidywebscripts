@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.12.1
+// @version      3.12.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -270,8 +270,8 @@
                     updateSliderDisplay(input, valueDisplay, config);
                     // Store the raw value (0-1 for percentages)
                     localStorage.setItem(storageKey, input.value);
-                    console.log(`Setting ${storageKey} updated to:`, input.value);
-                    console.log(getSetting(Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey)));
+                    //console.log(`Setting ${storageKey} updated to:`, input.value);
+                    //console.log(getSetting(Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey)));
                     if (onChange) onChange(input.value);
                 });
 
