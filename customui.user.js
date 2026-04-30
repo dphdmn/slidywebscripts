@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.12.0
+// @version      3.12.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -99,12 +99,26 @@
         cursorEnabled: 'slidysim_dph_script_cursor_enabled'
     };
 
+     // Settings that should be parsed as floats even if their defaults are integers
+    const FLOAT_SETTINGS = new Set([
+        'puzzleDim',
+        'bgDim',
+        'blankColorOpacity',
+        'uiOpacity',
+        'inactiveBrightness',
+        'soundVolume'
+    ]);
+
     function getSetting(key) {
         const stored = localStorage.getItem(STORAGE_KEYS[key]);
         if (stored === null) return DEFAULT_CONFIG[key];
         const def = DEFAULT_CONFIG[key];
         if (typeof def === 'boolean') return stored !== 'false';
         if (typeof def === 'number') {
+            // If this setting is marked as a float, always use parseFloat
+            if (FLOAT_SETTINGS.has(key)) {
+                return parseFloat(stored);
+            }
             if (Number.isInteger(def)) return parseInt(stored, 10);
             return parseFloat(stored);
         }
@@ -256,6 +270,8 @@
                     updateSliderDisplay(input, valueDisplay, config);
                     // Store the raw value (0-1 for percentages)
                     localStorage.setItem(storageKey, input.value);
+                    console.log(`Setting ${storageKey} updated to:`, input.value);
+                    console.log(getSetting(Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey)));
                     if (onChange) onChange(input.value);
                 });
 
@@ -559,7 +575,7 @@
         defaultValue: DEFAULT_CONFIG.puzzleDim,
         storageKey: STORAGE_KEYS.puzzleDim,
         unit: '%',
-        min: '0',
+        min: '0.5',
         max: '1',
         step: '0.01',
         onChange: (val) => applyPuzzleDim(parseFloat(val))
@@ -2194,6 +2210,7 @@
 
         // Restore puzzle dim
         const savedPuzzleDim = getSetting('puzzleDim');
+        //console.log(savedPuzzleDim);
         puzzleDimSetting.setValue(savedPuzzleDim);
         applyPuzzleDim(savedPuzzleDim);
 
