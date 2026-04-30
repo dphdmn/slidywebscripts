@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.8
+// @version      3.25.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1027,22 +1027,42 @@
         'soundVolume'
     ]);
 
-    function getSetting(key) {
-        const stored = localStorage.getItem(STORAGE_KEYS[key]);
-        if (stored === null) return DEFAULT_CONFIG[key];
+    const currentConfig = { ...DEFAULT_CONFIG };
+
+    function parseSettingValue(key, rawValue) {
         const def = DEFAULT_CONFIG[key];
-        if (typeof def === 'boolean') return stored !== 'false';
-        if (typeof def === 'number') {
-            // If this setting is marked as a float, always use parseFloat
-            if (FLOAT_SETTINGS.has(key)) {
-                return parseFloat(stored);
-            }
-            if (Number.isInteger(def)) return parseInt(stored, 10);
-            return parseFloat(stored);
+        if (typeof def === 'boolean') {
+            return rawValue === true || rawValue === 'true';
         }
-        return stored;
+        if (typeof def === 'number') {
+            if (FLOAT_SETTINGS.has(key)) {
+                return parseFloat(rawValue);
+            }
+            if (Number.isInteger(def)) {
+                return parseInt(rawValue, 10);
+            }
+            return parseFloat(rawValue);
+        }
+        return rawValue;
     }
 
+    function loadStoredSettings() {
+        Object.keys(STORAGE_KEYS).forEach(key => {
+            const stored = localStorage.getItem(STORAGE_KEYS[key]);
+            currentConfig[key] = stored === null ? DEFAULT_CONFIG[key] : parseSettingValue(key, stored);
+        });
+    }
+
+    function saveSettingValue(key, value) {
+        const parsedValue = parseSettingValue(key, value);
+        currentConfig[key] = parsedValue;
+        localStorage.setItem(STORAGE_KEYS[key], String(value));
+        return parsedValue;
+    }
+
+    function getCurrentSetting(key) {
+        return currentConfig[key];
+    }
 
     function unlockKeys() {
         window.addEventListener('keydown', function (e) {
@@ -1094,6 +1114,7 @@
             defaultValue,
             storageKey,
             onChange,
+            onRestore,
             containerStyle = {},
             min,
             max,
@@ -1103,6 +1124,7 @@
             checked
         } = config;
 
+        const settingKey = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
         const container = document.createElement('div');
         container.className = 'slidy-setting-container';
         if (type === 'hidden') {
@@ -1120,6 +1142,30 @@
 
         let input, valueDisplay;
 
+        function updateValueDisplay() {
+            if (valueDisplay) {
+                updateSliderDisplay(input, valueDisplay, config);
+            }
+        }
+
+        function setInputValue(value) {
+            if (type === 'checkbox') {
+                input.checked = Boolean(value);
+            } else {
+                input.value = value;
+            }
+            updateValueDisplay();
+        }
+
+        function persistValue(value) {
+            if (!settingKey) return value;
+            return saveSettingValue(settingKey, value);
+        }
+
+        function notifyChange(parsedValue) {
+            if (onChange) onChange(parsedValue);
+        }
+
         switch (type) {
             case 'slider':
                 input = document.createElement('input');
@@ -1127,24 +1173,17 @@
                 input.min = min;
                 input.max = max;
                 input.step = step;
-                // Use getSetting for default value
-                const settingKey = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
-                input.value = settingKey !== undefined ? getSetting(settingKey) : defaultValue;
+                input.value = defaultValue;
                 input.className = 'slidy-slider';
 
                 valueDisplay = document.createElement('span');
                 valueDisplay.className = 'slidy-slider-value';
-
-                // FIXED: Ensure display is updated on creation
-                updateSliderDisplay(input, valueDisplay, config);
+                updateValueDisplay();
 
                 input.addEventListener('input', () => {
-                    updateSliderDisplay(input, valueDisplay, config);
-                    // Store the raw value (0-1 for percentages)
-                    localStorage.setItem(storageKey, input.value);
-                    //console.log(`Setting ${storageKey} updated to:`, input.value);
-                    //console.log(getSetting(Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey)));
-                    if (onChange) onChange(input.value);
+                    const parsedValue = persistValue(input.value);
+                    updateValueDisplay();
+                    notifyChange(parsedValue);
                 });
 
                 container.appendChild(input);
@@ -1154,13 +1193,12 @@
             case 'color':
                 input = document.createElement('input');
                 input.type = 'color';
-                const settingKeyColor = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
-                input.value = settingKeyColor !== undefined ? getSetting(settingKeyColor) : defaultValue;
+                input.value = defaultValue;
                 input.className = 'slidy-color-input';
 
                 input.addEventListener('input', () => {
-                    localStorage.setItem(storageKey, input.value);
-                    if (onChange) onChange(input.value);
+                    const parsedValue = persistValue(input.value);
+                    notifyChange(parsedValue);
                 });
 
                 container.appendChild(input);
@@ -1170,14 +1208,12 @@
                 input = document.createElement('input');
                 input.type = 'checkbox';
                 input.id = id;
-                const settingKeyCheck = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
-                const storedChecked = settingKeyCheck !== undefined ? getSetting(settingKeyCheck) : null;
-                input.checked = storedChecked !== null ? storedChecked : (checked !== undefined ? checked : true);
+                input.checked = checked !== undefined ? checked : Boolean(DEFAULT_CONFIG[settingKey]);
                 input.className = 'slidy-checkbox';
 
                 input.addEventListener('change', () => {
-                    localStorage.setItem(storageKey, input.checked);
-                    if (onChange) onChange(input.checked);
+                    const parsedValue = persistValue(input.checked);
+                    notifyChange(parsedValue);
                 });
 
                 container.appendChild(input);
@@ -1194,12 +1230,11 @@
                     input.appendChild(option);
                 });
 
-                const settingKeySelect = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
-                input.value = settingKeySelect !== undefined ? getSetting(settingKeySelect) : defaultValue;
+                input.value = defaultValue;
 
                 input.addEventListener('change', () => {
-                    localStorage.setItem(storageKey, input.value);
-                    if (onChange) onChange(input.value);
+                    const parsedValue = persistValue(input.value);
+                    notifyChange(parsedValue);
                 });
 
                 container.appendChild(input);
@@ -1209,39 +1244,44 @@
                 input = document.createElement('input');
                 input.type = 'text';
                 input.placeholder = placeholder || '';
-                const settingKeyText = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
-                input.value = settingKeyText !== undefined ? getSetting(settingKeyText) : defaultValue;
+                input.value = defaultValue;
                 input.className = 'slidy-text-input';
 
                 input.addEventListener('input', () => {
-                    localStorage.setItem(storageKey, input.value);
-                    if (onChange) onChange(input.value);
+                    const parsedValue = persistValue(input.value);
+                    notifyChange(parsedValue);
                 });
 
                 container.appendChild(input);
                 break;
         }
 
+        function setValue(val, options = { store: true, notify: true }) {
+            const value = val === undefined || val === null ? DEFAULT_CONFIG[settingKey] : val;
+            setInputValue(value);
+            const parsedValue = options.store && settingKey ? saveSettingValue(settingKey, value) : parseSettingValue(settingKey, value);
+            if (options.notify) {
+                if (onChange) onChange(parsedValue);
+            }
+            return parsedValue;
+        }
+
+        function restore(val) {
+            const restoredValue = val === undefined ? DEFAULT_CONFIG[settingKey] : val;
+            setValue(restoredValue, { store: true, notify: Boolean(onRestore || onChange) });
+            if (onRestore) {
+                onRestore(currentConfig[settingKey]);
+            }
+        }
+
         return {
             container,
             input,
-            getValue: () => {
-                if (type === 'checkbox') return input.checked;
-                return input.value;
-            },
-            setValue: (val) => {
-                if (type === 'checkbox') {
-                    input.checked = val;
-                } else {
-                    input.value = val;
-                }
-                localStorage.setItem(storageKey, val);
-                if (onChange) onChange(val);
-                // Update display for sliders
-                if (type === 'slider' && valueDisplay) {
-                    updateSliderDisplay(input, valueDisplay, config);
-                }
-            }
+            getValue: () => (type === 'checkbox' ? input.checked : input.value),
+            setValue,
+            restore,
+            settingKey,
+            storageKey
         };
     }
 
@@ -1260,6 +1300,67 @@
     let cursorDb = null;
     let currentBlobUrl = null;
     let currentCursorBlobUrl = null;
+
+
+    async function restoreSettings() {
+        loadStoredSettings();
+
+        Object.keys(settings).forEach(key => {
+            const setting = settings[key];
+            const value = currentConfig[key];
+
+            if (!setting) return;
+
+            if (key === 'cursorEnabled') {
+                if (typeof setting.setValue === 'function') {
+                    setting.setValue(value, { store: true, notify: false });
+                }
+                return;
+            }
+
+            if (typeof setting.restore === 'function') {
+                setting.restore(value);
+            } else if (typeof setting.setValue === 'function') {
+                setting.setValue(value);
+            }
+        });
+
+        // Ensure sound debounce is synced even if onChange did not run
+        soundDebounceTime = currentConfig.soundDebounce;
+
+        // Load background from IndexedDB
+        try {
+            const blob = await loadFromDB();
+            if (blob) {
+                if (currentBlobUrl) {
+                    URL.revokeObjectURL(currentBlobUrl);
+                }
+                currentBlobUrl = URL.createObjectURL(blob);
+                applyBackground(currentBlobUrl, currentConfig.bgDim);
+            }
+        } catch (error) {
+            console.error('Failed to load background:', error);
+        }
+
+        // Load cursor from IndexedDB
+        try {
+            const cursorBlob = await loadCursorFromDB();
+            if (cursorBlob) {
+                if (currentCursorBlobUrl) {
+                    URL.revokeObjectURL(currentCursorBlobUrl);
+                }
+                currentCursorBlobUrl = URL.createObjectURL(cursorBlob);
+                cursorRemoveBtn.style.display = 'block';
+                if (currentConfig.cursorEnabled) {
+                    toggleCustomCursor(true);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load cursor:', error);
+        }
+
+        removeModuleContainerBackground();
+    }
 
     function openDB() {
         return new Promise((resolve, reject) => {
@@ -1722,6 +1823,8 @@
         let debounceTimer = null;
         let fontsLoaded = false;
 
+        const storageKeyName = Object.keys(STORAGE_KEYS).find(k => STORAGE_KEYS[k] === storageKey);
+
         // Initialize - just set initial value, don't load fonts yet
         async function init() {
             // Use current availableFonts (initially just Arial)
@@ -1729,8 +1832,7 @@
             filteredFonts = fonts;
             renderDropdown();
 
-            // Set initial value
-            const savedValue = getSetting('fontFamily');
+            const savedValue = storageKeyName ? currentConfig[storageKeyName] : defaultValue;
             if (savedValue && savedValue !== 'custom') {
                 selectFont(savedValue, false);
             } else if (savedValue === 'inherit') {
@@ -1823,7 +1925,9 @@
 
             if (notify && onChange) {
                 const value = font === 'Default' ? 'inherit' : font;
-                localStorage.setItem(storageKey, value);
+                if (storageKeyName) {
+                    saveSettingValue(storageKeyName, value);
+                }
                 onChange(value);
             }
         }
@@ -1928,16 +2032,38 @@
             setValue: (val) => {
                 if (val === 'inherit' || val === 'Default') {
                     selectFont('Default', false);
+                    if (storageKeyName) saveSettingValue(storageKeyName, 'inherit');
+                    if (onChange) onChange('inherit');
                 } else if (val === 'custom') {
-                    // Handle custom font prompt
                     const customFont = prompt('Enter font family name: (it must exist on your system, otherwise default will be loaded)', localStorage.getItem('slidysim_dph_script_font_family_custom') || 'Arial');
                     if (customFont) {
                         localStorage.setItem('slidysim_dph_script_font_family_custom', customFont);
+                        if (storageKeyName) saveSettingValue(storageKeyName, customFont);
                         selectFont(customFont, true);
                         if (onChange) onChange(customFont);
                     }
-                } else if (val && fonts.includes(val)) {
+                } else if (val) {
                     selectFont(val, false);
+                    if (storageKeyName) saveSettingValue(storageKeyName, val);
+                    if (onChange) onChange(val);
+                }
+            },
+            restore: (val) => {
+                let actualValue = val;
+                if (actualValue === 'custom') {
+                    const customFont = localStorage.getItem('slidysim_dph_script_font_family_custom');
+                    if (customFont) {
+                        actualValue = customFont;
+                    }
+                }
+                if (actualValue === 'inherit' || actualValue === 'Default') {
+                    selectFont('Default', false);
+                    if (storageKeyName) saveSettingValue(storageKeyName, 'inherit');
+                    if (onChange) onChange('inherit');
+                } else if (actualValue) {
+                    selectFont(actualValue, false);
+                    if (storageKeyName) saveSettingValue(storageKeyName, actualValue);
+                    if (onChange) onChange(actualValue);
                 }
             }
         };
@@ -2400,8 +2526,8 @@
         startX = clientX;
         startY = clientY;
 
-        const currentLeft = parseFloat(puzzleContainer.style.left) || getSetting('puzzleLeft');
-        const currentTop = parseFloat(puzzleContainer.style.top) || getSetting('puzzleTop');
+        const currentLeft = parseFloat(puzzleContainer.style.left) || currentConfig.puzzleLeft;
+        const currentTop = parseFloat(puzzleContainer.style.top) || currentConfig.puzzleTop;
         startLeft = currentLeft;
         startTop = currentTop;
 
@@ -2637,7 +2763,7 @@
         const mainContainer = document.querySelector('.main-content-container');
         if (mainContainer && blobUrl) {
             const dim = dimAmount !== undefined ? dimAmount : parseFloat(settings.bgDim.getValue());
-            const blur = settings.bgBlur ? parseFloat(settings.bgBlur.getValue()) : getSetting('bgBlur');
+            const blur = settings.bgBlur ? parseFloat(settings.bgBlur.getValue()) : currentConfig.bgBlur;
 
             // Use pseudo-element for blur effect
             let blurStyleEl = document.getElementById('slidy-blur-bg-style');
@@ -2940,12 +3066,12 @@
     // ==================== SOUND FUNCTIONALITY ====================
 
     let soundAudio = null;
-    let soundDebounceTime = getSetting('soundDebounce');
+    let soundDebounceTime = currentConfig.soundDebounce;
     let soundObserver = null;
 
     function initSound() {
         const puzzle = document.querySelector('.puzzle');
-        const volume = getSetting('soundVolume');
+        const volume = currentConfig.soundVolume;
 
         if (!puzzle || (volume < 0.02)) {
             return;
@@ -2997,7 +3123,7 @@
         const standardStatsPanel = document.querySelector('.standard-stats-panel');
         if (!container || !standardStatsPanel) return;
         container.classList.remove('rounded');
-        const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
+        const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (hideHeaderDuringSolves || isZenMode) {
             if (isCornerMode) {
                 container.classList.toggle('left-hack', scrambled || isZenMode);
@@ -3284,148 +3410,6 @@
 
     // ==================== INITIALIZATION ====================
 
-    async function restoreSettings() {
-        // Restore background dim
-        const savedBgDim = getSetting('bgDim');
-        bgDimSetting.setValue(savedBgDim);
-
-        // Restore background blur
-        const savedBgBlur = getSetting('bgBlur');
-        bgBlurSetting.setValue(savedBgBlur);
-
-        // Restore puzzle dim
-        const savedPuzzleDim = getSetting('puzzleDim');
-        //console.log(savedPuzzleDim);
-        puzzleDimSetting.setValue(savedPuzzleDim);
-        applyPuzzleDim(savedPuzzleDim);
-
-        // Restore blank color settings
-        const savedBlankColorOpacity = getSetting('blankColorOpacity');
-        blankColorOpacitySetting.setValue(savedBlankColorOpacity);
-        const savedBlankColor = getSetting('blankColor');
-        blankColorSetting.setValue(savedBlankColor);
-        applyBlankColor();
-
-        // Restore UI opacity
-        const savedUIOpacity = getSetting('uiOpacity');
-        uiOpacitySetting.setValue(savedUIOpacity);
-        applyUIOpacity(savedUIOpacity);
-
-        // Restore puzzle position
-        const savedPuzzleLeft = getSetting('puzzleLeft');
-        puzzleLeftSetting.setValue(savedPuzzleLeft);
-        const savedPuzzleTop = getSetting('puzzleTop');
-        puzzleTopSetting.setValue(savedPuzzleTop);
-        applyPuzzlePosition();
-
-        // Restore borders
-        const savedBorderWidth = getSetting('borderWidth');
-        const savedBorderColor = getSetting('borderColor');
-        borderWidthSetting.setValue(savedBorderWidth);
-        borderColorSetting.setValue(savedBorderColor);
-        applyBorder(savedBorderWidth, savedBorderColor);
-
-        // Restore grids borders
-        const savedGridsBorderWidth = getSetting('gridsBorderWidth');
-        const savedGridsBorderColor = getSetting('gridsBorderColor');
-        gridsBorderWidthSetting.setValue(savedGridsBorderWidth);
-        gridsBorderColorSetting.setValue(savedGridsBorderColor);
-
-        // Restore font settings
-        const savedFontFamily = getSetting('fontFamily');
-        const customFont = localStorage.getItem('slidysim_dph_script_font_family_custom');
-        if (savedFontFamily === 'custom' && customFont) {
-            fontFamilySetting.setValue(customFont);
-            applyFontFamily(customFont);
-        } else {
-            fontFamilySetting.setValue(savedFontFamily);
-            applyFontFamily(savedFontFamily);
-        }
-
-        const savedFontSize = getSetting('fontSize');
-        fontSizeSetting.setValue(savedFontSize);
-        applyFontSize(savedFontSize);
-
-        const savedBold = getSetting('bold');
-        boldSetting.setValue(savedBold);
-        applyBold(savedBold);
-
-        const savedBorderRadius = getSetting('borderRadius');
-        borderRadiusSetting.setValue(savedBorderRadius);
-        applyBorderRadius(savedBorderRadius);
-
-        // Restore inactive brightness
-        const savedInactiveBrightness = getSetting('inactiveBrightness');
-        inactiveBrightnessSetting.setValue(savedInactiveBrightness);
-        applyInactiveBrightness(savedInactiveBrightness);
-
-        // Restore base9
-        const savedBase9 = getSetting('base9');
-        base9Setting.setValue(savedBase9);
-
-        // Restore sound settings
-        const savedSoundEnabled = getSetting('soundEnabled');
-        soundEnableSetting.setValue(savedSoundEnabled);
-        const savedSoundVolume = getSetting('soundVolume');
-        soundVolumeSetting.setValue(savedSoundVolume);
-        const savedSoundDebounce = getSetting('soundDebounce');
-        soundDebounceSetting.setValue(savedSoundDebounce);
-        soundDebounceTime = savedSoundDebounce;
-
-        // Restore minimize avgs
-        const minimizeAvgs = getSetting('minimizeAvgs');
-        minimizeAvgsSetting.setValue(minimizeAvgs);
-        if (minimizeAvgs) {
-            replaceText();
-        }
-
-        // Restore minimize sessions
-        const savedMinimizeSessions = getSetting('minimizeSessions');
-        minimizeSessionsSetting.setValue(savedMinimizeSessions);
-        if (savedMinimizeSessions) {
-            minimizeSessions();
-        }
-
-        // Restore hide header during solves
-        const savedHideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
-        hideHeaderDuringSolvesSetting.setValue(savedHideHeaderDuringSolves);
-
-        // Load background from IndexedDB
-        try {
-            const blob = await loadFromDB();
-            if (blob) {
-                if (currentBlobUrl) {
-                    URL.revokeObjectURL(currentBlobUrl);
-                }
-                currentBlobUrl = URL.createObjectURL(blob);
-                applyBackground(currentBlobUrl, savedBgDim);
-            }
-        } catch (error) {
-            console.error('Failed to load background:', error);
-        }
-
-        // Load cursor from IndexedDB
-        try {
-            const cursorBlob = await loadCursorFromDB();
-            if (cursorBlob) {
-                if (currentCursorBlobUrl) {
-                    URL.revokeObjectURL(currentCursorBlobUrl);
-                }
-                currentCursorBlobUrl = URL.createObjectURL(cursorBlob);
-                cursorRemoveBtn.style.display = 'block';
-                // Restore cursor enabled state
-                const savedCursorEnabled = getSetting('cursorEnabled');
-                cursorEnabledSetting.setValue(savedCursorEnabled);
-                if (savedCursorEnabled) {
-                    toggleCustomCursor(true);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to load cursor:', error);
-        }
-
-        removeModuleContainerBackground();
-    }
 
     async function init() {
         try {
@@ -3823,7 +3807,7 @@
         //fixZoom();
         const state = detectPuzzleState(mutations);
         //console.log(state);
-        const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
+        const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (state === "scrambled") {
             formatSingleSolve(false);
             unlockKeys();
@@ -3853,15 +3837,15 @@
         removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
 
-        if (getSetting('minimizeAvgs') || isZenMode) {
+        if (currentConfig.minimizeAvgs || isZenMode) {
             replaceText();
         }
 
-        if (getSetting('base9')) {
+        if (currentConfig.base9) {
             convertBase9();
         }
 
-        if (getSetting('minimizeSessions')) {
+        if (currentConfig.minimizeSessions) {
             minimizeSessions();
         }
 
@@ -3888,8 +3872,7 @@
         if (currentBlobUrl) {
             const mainContainer = document.querySelector('.main-content-container');
             if (mainContainer && !mainContainer.style.background.includes('blob:')) {
-                const savedBgDim = getSetting('bgDim');
-                applyBackground(currentBlobUrl, savedBgDim);
+                applyBackground(currentBlobUrl, currentConfig.bgDim);
             }
         }
 
