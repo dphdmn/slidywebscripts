@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.1
+// @version      3.24.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3122,6 +3122,9 @@
         if (e.key === 'PageUp') setTimeout(() => stepZoom(+1), 0);
         if (e.key === 'PageDown') setTimeout(() => stepZoom(-1), 0);
         if (e.key === 'End') {
+            settings.puzzleLeft.setValue(0);
+            settings.puzzleTop.setValue(0);
+            applyPuzzlePosition();
             if (isZoomDefault()) {
                 setMaxSize();
             } else {
