@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.11.0
+// @version      3.12.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -23,7 +23,7 @@
     document.head.insertAdjacentHTML('beforeend', '<style>.focus-area:focus-visible{outline:none!important}</style>'); //stupid outline fix
     // Create and inject the CSS class
     const style = document.createElement('style');
-    style.textContent = '.left-hack{position:fixed !important;bottom:0 !important;left:0 !important;max-width:200px}.left-hack td{font-size:12px !important;}.center-hack{position:fixed !important;bottom:0 !important;left:50% !important;transform:translateX(-50%) !important;font-size:12px !important;max-width:200px}.center-hack td{font-size:12px !important;}';
+    style.textContent = '.left-hack{position:fixed !important;top:0 !important;left:0 !important;max-width:250px}.left-hack td{font-size:12px !important;}.left-hack table{min-height:var(--header_height) !important;max-height:var(--header_height) !important;}.center-hack{position:fixed !important;top:0 !important;left:50% !important;transform:translateX(-50%) !important;font-size:12px !important;max-width:250px}.center-hack td{font-size:12px !important;}.center-hack table{min-height:var(--header_height) !important;max-height:var(--header_height) !important;}';
     document.head.appendChild(style);
     let adjustButton = null;
     let toggleCenterButton = null;
@@ -157,6 +157,14 @@
     document.head.appendChild(styleEl);
 
     // ==================== UTILITY FUNCTIONS ====================
+
+    function unlockKeys() {
+        window.addEventListener('keydown', function (e) {
+            if (['F11', 'F12'].includes(e.key)) {
+                e.stopImmediatePropagation();
+            }
+        }, true);
+    }
 
     function resetAllSettings() {
         Object.keys(STORAGE_KEYS).forEach(key => {
@@ -1791,15 +1799,7 @@
         puzzleContainers.forEach(container => {
             container.style.position = 'relative';
             container.style.left = leftVal + 'px';
-            if (addHeaderOffset) {
-                if (isCornerMode) {
-                    container.style.top = `calc(${topVal}px + var(--header_height))`;
-                } else {
-                    container.style.top = `calc(${topVal}px + var(--header_height) - 15px)`;
-                }
-            } else {
-                container.style.top = topVal + 'px';
-            }
+            container.style.top = topVal + 'px';
         });
     }
 
@@ -1971,10 +1971,13 @@
         const standardStatsPanel = document.querySelector('.standard-stats-panel');
         if (!container || !standardStatsPanel) return;
         container.classList.remove('rounded');
-        if (isCornerMode) {
-            container.classList.toggle('left-hack', scrambled);
-        } else {
-            container.classList.toggle('center-hack', scrambled);
+        const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
+        if (hideHeaderDuringSolves) {
+            if (isCornerMode) {
+                container.classList.toggle('left-hack', scrambled);
+            } else {
+                container.classList.toggle('center-hack', scrambled);
+            }
         }
         const thRow = container.querySelector('tr:has(th)');
         if (thRow) thRow.remove();
@@ -2369,6 +2372,10 @@
         user-select: none;
         }
 
+        .header {
+        z-index: 100 !important;
+        }
+
         .standard-main-panel {
         grid-area: a !important;
         position: relative !important;
@@ -2583,9 +2590,9 @@
                 if (mainContent) {
                     mainContent.style.top = '0';
                     mainContent.style.paddingTop = 'var(--header_height)';
-                    moduleContainer.style.marginTop = 'calc(-2 * var(--header_height))';
-                    standardMainPanel.style.marginBottom = 'calc(-1 * var(--header_height))';
-                    standardStatsPanel.style.top = 'calc(var(--header_height) + 10px) !important';
+                    //  moduleContainer.style.marginTop = 'calc(-2 * var(--header_height))';
+                    // standardMainPanel.style.marginBottom = 'calc(-1 * var(--header_height))';
+                    //  standardStatsPanel.style.top = 'calc(var(--header_height) + 15px) !important';
                 }
             }
         } else {
@@ -2593,9 +2600,9 @@
             header.style.display = 'flex';
             if (mainContent) {
                 mainContent.style.top = 'var(--header_height)';
-                standardMainPanel.style.marginBottom = '0';
+                //   standardMainPanel.style.marginBottom = '0';
                 mainContent.style.paddingTop = '0';
-                moduleContainer.style.marginTop = '0';
+                //  moduleContainer.style.marginTop = '0';
             }
             if (standardStatsPanel) {
                 standardStatsPanel.style.top = '0';
@@ -2611,6 +2618,7 @@
         const state = detectPuzzleState(mutations);
         const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
         if (state === "scrambled") {
+            unlockKeys();
             scrambled = true;
             if (hideHeaderDuringSolves) {
                 toggleHeader(false);
