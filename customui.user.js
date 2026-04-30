@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.18.1
+// @version      3.19.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -5048,6 +5048,9 @@
                 const trimRule = document.querySelector('input[name="trimRule"]:checked')?.value || '5%';
                 const customTrim = document.querySelector('#customTrimInput')?.value || '2';
                 const avgSizes = getSelectedAvgSizes();
+                if (!avgSizes.includes(solves.length)) {
+                    avgSizes.push(solves.length);
+                }
 
                 if (progressBar) progressBar.value = 0;
                 if (progressText) progressText.textContent = '0%';
