@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.23.1
+// @version      3.24.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -77,6 +77,7 @@
     let scrambled = false;
     let positionApplied = false;
     let isCornerMode = true;
+    let isZenMode = false;
 
     // ==================== DEFAULT CONFIGURATION ====================
 
@@ -2171,8 +2172,6 @@
         const leftVal = parseFloat(settings.puzzleLeft.getValue());
         const topVal = parseFloat(settings.puzzleTop.getValue());
 
-        const addHeaderOffset = (settings.hideHeaderDuringSolves.getValue() && scrambled);
-
         puzzleContainers.forEach(container => {
             container.style.position = 'relative';
             container.style.left = leftVal + 'px';
@@ -2360,11 +2359,11 @@
         if (!container || !standardStatsPanel) return;
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
-        if (hideHeaderDuringSolves) {
+        if (hideHeaderDuringSolves || isZenMode) {
             if (isCornerMode) {
-                container.classList.toggle('left-hack', scrambled);
+                container.classList.toggle('left-hack', scrambled || isZenMode);
             } else {
-                container.classList.toggle('center-hack', scrambled);
+                container.classList.toggle('center-hack', scrambled || isZenMode);
             }
         }
         const thRow = container.querySelector('tr:has(th)');
@@ -2381,16 +2380,28 @@
 
         container.querySelectorAll('tr[avg]').forEach(row => {
             const avg = row.getAttribute('avg');
-            if (scrambled) {
+            if (scrambled || isZenMode) {
                 row.style.display = avg === '1' ? '' : 'none';
                 const tds = container.querySelectorAll('tr[avg="1"] td');
-                tds[0].textContent = tds[0].textContent.replace("Single", '');
-                if (tds[0].textContent === '') {
+                const originalText = tds[0].textContent;
+                const textWithoutSingle = originalText.replace("Single", '');
+                if (textWithoutSingle.trim() === '') {
                     tds[0].style.display = 'none';
+                } else {
+                    tds[0].style.display = '';
                 }
-                tds[1].textContent = '';
-                tds[2].textContent = 'Ready';
-                tds[3].textContent = '';
+                if (scrambled) {
+                    tds[1].textContent = '';
+                    tds[2].textContent = 'Ready';
+                    tds[3].textContent = '';
+                    tds[1].style.color = 'yellow';
+                    tds[2].style.color = 'yellow';
+                    tds[3].style.color = 'yellow';
+                } else {
+                    // tds[1].style.color = 'white';
+                    // tds[2].style.color = 'white';
+                    // tds[3].style.color = 'white';
+                }
             } else {
                 container.querySelector('tr[avg="1"] td:first-child').style.display = '';
                 if (avg === 'session' || avg === '1') return;
@@ -2775,27 +2786,6 @@
         }
 
         removeModuleContainerBackground();
-
-        function handleUserInteraction(e) {
-            setTimeout(() => {
-                applyGridsBorder(
-                    parseInt(settings.gridsBorderWidth.getValue()),
-                    settings.gridsBorderColor.getValue()
-                );
-                applyInactiveBrightness(parseFloat(settings.inactiveBrightness.getValue()));
-                applyBorder(parseInt(settings.borderWidth.getValue()), settings.borderColor.getValue());
-                applyPuzzleDim(parseFloat(settings.puzzleDim.getValue()));
-                addHorizontalScroll();
-                if (settings.rawHardwareInput.getValue()) {
-                    overwriteInputs();
-                } else {
-                    restoreInputs();
-                }
-            }, 10);
-        }
-
-        document.addEventListener('keydown', handleUserInteraction);
-        document.addEventListener('pointerdown', handleUserInteraction);
     }
 
     async function init() {
@@ -3124,6 +3114,7 @@
         el.style.setProperty('--zoom-factor', out);
     }
 
+
     window.addEventListener('keydown', e => {
         if (e.key === 'PageUp') setTimeout(() => stepZoom(+1), 0);
         if (e.key === 'PageDown') setTimeout(() => stepZoom(-1), 0);
@@ -3134,7 +3125,87 @@
                 setDefaultSize();
             }
         }
+        if (e.altKey && e.key === 'Enter') {
+            e.preventDefault();
+            if (!isZenMode) {
+                enterZenMode();
+            } else {
+                exitZenMode();
+            }
+        }
+        if (e.key === '1' || e.key === '2') {
+            setTimeout(() => {
+                applyGridsBorder(
+                    parseInt(settings.gridsBorderWidth.getValue()),
+                    settings.gridsBorderColor.getValue()
+                );
+                applyInactiveBrightness(parseFloat(settings.inactiveBrightness.getValue()));
+
+            }, 0);
+        }
     });
+
+    function enterFullscreen(element) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) { // Safari
+            element.webkitRequestFullscreen();
+        } else if (element.msRequestFullscreen) { // IE/Edge
+            element.msRequestFullscreen();
+        }
+    }
+
+    function exitFullscreen() {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) { // Safari
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) { // IE/Edge
+            document.msExitFullscreen();
+        }
+    }
+
+
+    function enterZenMode() {
+        const mainContent = document.querySelector('.focus-container');
+        enterFullscreen(document.documentElement);
+        if (!mainContent) return;
+        toggleHeader(false);
+        replaceText();
+        isZenMode = true;
+    }
+
+    function exitZenMode() {
+        exitFullscreen(document.documentElement);
+        toggleHeader(true);
+        replaceText();
+        isZenMode = false;
+    }
+
+    function formatSingleSolve(finished) {
+        console.log(finished);
+        const container = document.querySelector('.stats-grid-container');
+        if (!container) return;
+        const tds = container.querySelectorAll('tr[avg="1"] td');
+        for (const td of tds) {
+            const index = Array.from(tds).indexOf(td);
+            if (index > 0) {
+                if (finished) {
+                    td.style.fontWeight = 'bold';
+                    td.style.setProperty('font-size', '14px', 'important');
+                    if (td.textContent !== 'DNF') {
+                        td.style.color = '#00b919';
+                    } else {
+                        td.style.color = 'red';
+                    }
+                } else {
+                    td.style.fontWeight = 'normal';
+                    td.style.setProperty('font-size', '12px', 'important');
+                    td.style.color = '#fff';
+                }
+            }
+        }
+    }
 
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
@@ -3146,9 +3217,10 @@
         //console.log(state);
         const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
         if (state === "scrambled") {
+            formatSingleSolve(false);
             unlockKeys();
             scrambled = true;
-            if (hideHeaderDuringSolves) {
+            if (hideHeaderDuringSolves || isZenMode) {
                 toggleHeader(false);
             }
             if (isEditingMode) {
@@ -3156,9 +3228,12 @@
             }
         } else if (state === "finished") {
             scrambled = false;
-            if (hideHeaderDuringSolves) {
+            if (hideHeaderDuringSolves && !isZenMode) {
                 toggleHeader(true);
             }
+            formatSingleSolve(true);
+        } else {
+            formatSingleSolve(false);
         }
 
         updateButtonVisibility();
@@ -3170,7 +3245,7 @@
         removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
 
-        if (getSetting('minimizeAvgs')) {
+        if (getSetting('minimizeAvgs') || isZenMode) {
             replaceText();
             forcePuzzleLayout();
         }
@@ -3209,6 +3284,20 @@
                 const savedBgDim = getSetting('bgDim');
                 applyBackground(currentBlobUrl, savedBgDim);
             }
+        }
+
+        applyGridsBorder(
+            parseInt(settings.gridsBorderWidth.getValue()),
+            settings.gridsBorderColor.getValue()
+        );
+        applyInactiveBrightness(parseFloat(settings.inactiveBrightness.getValue()));
+        applyBorder(parseInt(settings.borderWidth.getValue()), settings.borderColor.getValue());
+        applyPuzzleDim(parseFloat(settings.puzzleDim.getValue()));
+        addHorizontalScroll();
+        if (settings.rawHardwareInput.getValue()) {
+            overwriteInputs();
+        } else {
+            restoreInputs();
         }
 
         mainObserver.observe(document.body, { childList: true, subtree: true });
