@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.16.1
+// @version      3.17.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -2880,6 +2880,23 @@
         }
     }
 
+    function fixZoom() {
+        const container = document.querySelector('.puzzle-container');
+        if (!container) return;
+        let currentZoom = parseFloat(container.style.getPropertyValue('--zoom-factor'));
+        if (isNaN(currentZoom)) return;
+        
+        // Convert to hundredths using integer math
+        const currentHundredths = Math.round(currentZoom * 100);
+        const roundedHundredths = Math.round(currentHundredths / 4) * 4;
+        const clampedHundredths = Math.min(500, Math.max(0, roundedHundredths));
+        const clampedZoom = clampedHundredths / 100;
+        
+        console.log(`Original: ${currentZoom}, Fixed: ${clampedZoom}`);
+        
+        container.style.setProperty('--zoom-factor', clampedZoom);
+    }
+
     // ==================== MAIN MUTATION OBSERVER ====================
 
     function preventMutationSpam(mutations) {
@@ -3020,11 +3037,19 @@
         }
     }
 
+    // Event listener for Page Down and Page Up
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'PageDown' || e.key === 'PageUp') {
+            setTimeout(fixZoom, 0);
+        }
+    });
+
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
         if (preventMutationSpam(mutations)) return;
         //console.log('Mutations observed:', mutations.length);
         //logMutationDetails(mutations);
+        //fixZoom();
         const state = detectPuzzleState(mutations);
         //console.log(state);
         const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
