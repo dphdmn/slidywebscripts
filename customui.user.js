@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.14.1
+// @version      3.14.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -34,6 +34,39 @@
     const style = document.createElement('style');
     style.textContent = '.left-hack{position:fixed !important;top:0 !important;left:0 !important;max-width:250px}.left-hack td{font-size:12px !important;}.left-hack table{min-height:var(--header_height) !important;max-height:var(--header_height) !important;}.center-hack{position:fixed !important;top:0 !important;left:50% !important;transform:translateX(-50%) !important;font-size:12px !important;max-width:250px}.center-hack td{font-size:12px !important;}.center-hack table{min-height:var(--header_height) !important;max-height:var(--header_height) !important;}';
     document.head.appendChild(style);
+    document.documentElement.appendChild(Object.assign(document.createElement('style'), {
+        textContent: `
+            body,.focus-container{
+                scrollbar-width: auto !important;
+                scrollbar-color: #8a92b8 #0f1115 !important;
+            }
+
+            /* WebKit */
+            body::-webkit-scrollbar,
+            .focus-container::-webkit-scrollbar{
+                width: 12px !important;
+                height: 12px !important;
+            }
+
+            body::-webkit-scrollbar-track,
+            .focus-container::-webkit-scrollbar-track{
+                background: #0f1115 !important;
+            }
+
+            body::-webkit-scrollbar-thumb,
+            .focus-container::-webkit-scrollbar-thumb{
+                background: #8a92b8 !important;
+                border-radius: 10px !important;
+                border: 2px solid #0f1115 !important;
+                background-clip: padding-box !important;
+            }
+
+            body::-webkit-scrollbar-thumb:hover,
+            .focus-container::-webkit-scrollbar-thumb:hover{
+                background: #b3badf !important;
+            }
+            `}));
+
     let adjustButton = null;
     let toggleCenterButton = null;
     let isEditingMode = false;
@@ -3551,7 +3584,7 @@
                 margin-left: 4px;
             }
             .avgs-session-stats {
-                padding: 12px;
+                padding: 6px 12px;
                 background: #222;
                 border: 1px solid #555;
             }
