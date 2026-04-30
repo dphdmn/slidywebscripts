@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.15.0
+// @version      3.16.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -65,6 +65,8 @@
             .focus-container::-webkit-scrollbar-thumb:hover{
                 background: #b3badf !important;
             }
+
+            .dialog{position:fixed;top:var(--header_height);left:0;transform:none;margin:0;max-height:calc(100vh - var(--header_height));overflow-y:auto;background:#1a1a1a;border-right:1px solid #444;border-bottom:1px solid #444;border-top:none;border-left:none;padding:12px;min-width:650px}.tab-widget-button-container{display:flex;gap:0;margin-bottom:8px}.tab-widget-button{flex:1;text-align:center;padding:6px 10px;background:#1e1e1e;border:1px solid #333;border-bottom:none;color:#ddd;font-size:12px;font-weight:600;cursor:pointer}.tab-widget-button+.tab-widget-button{border-left:1px solid #333}.tab-widget-button.selected{background:#222;color:#fff;border-color:#00bcd4;border-bottom:2px solid #00bcd4;margin-bottom:-1px}.tab-widget-button.selected+.tab-widget-button{border-left:1px solid #00bcd4}.tab-widget-button:hover:not(.selected){background:#252525;color:#fff}.tab-widget-content-container{background:#222;border:1px solid #00bcd4;border-top:none;padding:10px;min-height:240px}.form-row{display:flex;align-items:center;padding:6px 0;border-bottom:1px solid #2a2a2a}.form-row:last-child{border-bottom:none}.form-row label{flex:0 0 100px;font-size:12px;color:#ddd;padding-right:8px;text-align:right;font-weight:600}.form-row .value-container{flex:1}.form-row input,.form-row select{background:#2a2a2a;border:1px solid #3a3a3a;color:#fff;padding:4px 8px;font-size:12px;width:100%;box-sizing:border-box;outline:none}.form-row select{background:#1e1e1e;cursor:pointer}.form-row select option{background:#1e1e1e;color:#fff}.form-row input:focus,.form-row select:focus{border-color:#00bcd4}.form-row input[readonly]{color:#bbb;cursor:default;background:#1a1a1a;border-color:#2a2a2a}button.value{background:#2a2a2a;border:1px solid #444;color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:6px 10px}button.value:hover{background:#3a3a3a;border-color:#00bcd4;color:#fff}fieldset{border:none;padding:0;margin:0}legend{display:block;width:100%}
             `}));
 
     let adjustButton = null;
