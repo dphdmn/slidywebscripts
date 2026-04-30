@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.6
+// @version      3.24.7
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -186,34 +186,59 @@
         .slidy-dropdown-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 8px; cursor: pointer; font-size: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
 
         .slidy-dropdown-menu {
-            display: none;
-            position: fixed;
-            top: var(--header_height);
-            left: 0;
-            background: rgba(30, 30, 30, 0.95);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 6px;
-            padding: 12px;
-            min-width: 400px;
-            max-height: 80vh;
-            overflow-y: auto;
-            z-index: 10000;
-            margin-top: 4px;
+    display: none;
+    position: fixed;
+    top: var(--header_height);
+    left: 0;
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    padding: 12px;
+    min-width: 400px;
+    max-width: 1200px;
+    max-height: 100vh;
+    overflow-y: auto;
+    z-index: 10000;
+    margin-top: 4px;
+}
 
-            display: none;
-            grid-template-columns: repeat(3, minmax(300px, 1fr));
-            gap: 12px;
-        }
+/* Your JS sets display:grid, so these go on the base class */
+.slidy-dropdown-menu {
+    grid-template-columns: repeat(3, minmax(300px, 1fr));
+    gap: 12px;
+}
 
-        .slidy-setting-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            padding: 8px;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 6px;
-        }
+/* Laptop */
+@media (max-width: 1023px) {
+    .slidy-dropdown-menu {
+        min-width: 600px;
+        max-width: 90vw;
+        grid-template-columns: repeat(2, minmax(250px, 1fr));
+    }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+    .slidy-dropdown-menu {
+        left: 0;
+        right: 0;
+        min-width: unset;
+        max-width: 100%;
+        width: 100vw;
+        grid-template-columns: 1fr;
+    }
+}
+
+.slidy-setting-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px;
+}
+
 
         .slidy-action-btn {
             background: rgba(255,255,255,0.1);
@@ -383,9 +408,10 @@
             background: rgba(30, 30, 30, 0.98);
             border: 1px solid #444;
             border-radius: 4px;
-            max-height: 250px;
+            max-height: 210px;
+            min-width: 250px;
             overflow-y: auto;
-            z-index: 10001;
+            z-index: 100001;
             margin-top: 2px;
         }
 
