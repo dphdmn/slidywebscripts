@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.22.0
+// @version      3.23.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -2404,92 +2404,155 @@
     }
 
     function minimizeSessions() {
-        const sessionInfo = document.querySelector('.session-info');
-        if (!sessionInfo) return;
-        if (sessionInfo.getAttribute('data-slidy-sessions-minimized') === 'true') return;
-        const sessionBackgrounds = document.querySelectorAll('.session-background-inner');
-        sessionInfo.setAttribute('data-slidy-sessions-minimized', 'true');
+        // Page‑level guard (same as original)
+        const guardSessionInfo = document.querySelector('.session-info');
+        if (!guardSessionInfo) return;
+        if (guardSessionInfo.getAttribute('data-slidy-sessions-minimized') === 'true') return;
+        guardSessionInfo.setAttribute('data-slidy-sessions-minimized', 'true');
 
+        const sessionBackgrounds = document.querySelectorAll('.session-background-inner');
+        const visibleSessions = []; // will hold sessionInfo elements for later centering
+        let maxDivCount = 0;
+
+        // ----- Single pass: filter, text‑replacement, empty removal, tooltip merge -----
         sessionBackgrounds.forEach(bg => {
             const sessionName = bg.querySelector('.session-name');
-            if (sessionName && ['delete', 'remove', 'hide', 'hidden'].includes(sessionName.textContent.trim().toLowerCase())) {
+
+            // Hide if session name matches blacklist
+            if (sessionName && ['delete', 'remove', 'hide', 'hidden'].includes(
+                sessionName.textContent.trim().toLowerCase()
+            )) {
                 bg.parentNode.parentNode.parentNode.parentNode.style.display = 'none';
                 return;
             }
-            const sessionInfo = bg.querySelector('.session-info');
 
+            const sessionInfo = bg.querySelector('.session-info');
             if (!sessionInfo) return;
 
-            const infoDivs = Array.from(sessionInfo.querySelectorAll('div'));
+            // --- Tooltip merge  ---
+            const sessionContainer = bg.parentNode.parentNode.parentNode;
+            const tooltipContainer = sessionContainer.querySelector('.session-info-tooltip');
+            if (tooltipContainer) {
+                const tooltipDivs = tooltipContainer.querySelectorAll('div');
+                tooltipDivs.forEach(tipDiv => {
+                    let text = tipDiv.textContent.trim();
+                    text = text.replace(/Showing optimal length /g, '').replace(/[\(\)\[\]\{\}]/g, '');
+                    const newDiv = document.createElement('div');
+                    newDiv.textContent = text || '\u00A0'; // preserve intentional empty rows
+                    sessionInfo.appendChild(newDiv);
+                });
+                tooltipContainer.remove();
+            }
 
-            // Process each info div
-            infoDivs.forEach((div, index) => {
+            // --- Text replacements on existing divs (originally pass 1) ---
+            const divs = Array.from(sessionInfo.querySelectorAll('div'));
+            divs.forEach(div => {
                 let text = div.textContent.trim();
-
-                // Remove "Standard" completely
-                if (text === 'Standard') {
-                    div.textContent = '\u00A0';
+                // Apply all text modifications
+                if (text === 'Standard' || text === 'Mouse hover (Lines)') {
+                    div.remove(); // immediately remove instead of using \u00A0
                     return;
                 }
-
-                // Remove "Mouse hover (Lines)" completely
-                if (text === 'Mouse hover (Lines)') {
-                    div.textContent = '\u00A0';
-                    return;
-                }
-
-                // Replace "Fewest moves" with "FMC"
                 if (text === 'Fewest moves') {
                     div.textContent = 'FMC';
                     return;
                 }
-
-                // Replace "width+height relay" parts with "EUT"
                 if (text.includes('width+height relay')) {
-                    div.textContent = text.replace(/width\+height relay/g, 'EUT');
-                    return;
+                    text = text.replace(/width\+height relay/g, 'EUT');
                 }
-
-                // Replace "2x2-" parts (with a minus) with empty string
                 if (text.includes('2x2-')) {
-                    div.textContent = text.replace(/2x2-/g, '');
-                    return;
+                    text = text.replace(/2x2-/g, '');
                 }
-
-                // Remove " marathon" parts
                 if (text.includes(' marathon')) {
-                    div.textContent = text.replace(/ marathon/g, '');
-                    return;
+                    text = text.replace(/ marathon/g, '');
                 }
-
-                // Remove " solves" parts
                 if (text.includes(' solves')) {
-                    div.textContent = text.replace(/ solves/g, '');
-                    return;
+                    text = text.replace(/ solves/g, ' attempts');
                 }
-
+                // If after processing the text is empty, remove the div
+                if (text.trim() === '') {
+                    div.remove();
+                } else {
+                    div.textContent = text;
+                }
             });
-            // Move the last div to the 2nd position AFTER processing
-            if (infoDivs.length >= 2) {
-                const lastDiv = infoDivs[infoDivs.length - 1];
-                const secondDiv = sessionInfo.children[1]; // Target position (2nd index)
-                sessionInfo.insertBefore(lastDiv, secondDiv);
-            }
 
-            // Check if first element of session-info is a substring of session-name
             const remainingDivs = Array.from(sessionInfo.querySelectorAll('div'));
             if (remainingDivs.length > 0 && sessionName) {
-                const firstInfoText = remainingDivs[0].textContent.trim();
                 const sessionNameText = sessionName.textContent.trim();
-
-                if (sessionNameText.includes(firstInfoText)) {
-                    remainingDivs[0].textContent = '\u00A0';
-                }
+                remainingDivs.forEach(div => {
+                    const divText = div.textContent.trim();
+                    if (divText !== '' && sessionNameText.toLowerCase().includes(divText.toLowerCase())) {
+                        div.remove();
+                    }
+                });
             }
-            //remove one empty div if there is one:
-            const emptyDivs = Array.from(sessionInfo.querySelectorAll('div')).filter(div => div.textContent === '\u00A0');
-            if (emptyDivs.length > 0) {
-                emptyDivs[0].textContent = '';
+
+            // --- Store for centering pass ---
+            const finalDivCount = sessionInfo.querySelectorAll('div').length;
+            if (finalDivCount > maxDivCount) maxDivCount = finalDivCount;
+            visibleSessions.push(sessionInfo);
+        });
+
+        // ----- Second pass: normalize div count and center data -----
+        visibleSessions.forEach(sessionInfo => {
+            const allDivs = Array.from(sessionInfo.querySelectorAll('div'));
+            const currentCount = allDivs.length;
+            const emptyNeeded = maxDivCount - currentCount;
+
+            if (emptyNeeded > 0) {
+                // Add empty rows to reach maxCount, centering existing content
+                const emptyBefore = Math.floor(emptyNeeded / 2);
+                const emptyAfter = emptyNeeded - emptyBefore;
+
+                for (let i = 0; i < emptyBefore; i++) {
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.textContent = '\u00A0';
+                    sessionInfo.insertBefore(emptyDiv, sessionInfo.firstChild);
+                }
+                for (let i = 0; i < emptyAfter; i++) {
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.textContent = '\u00A0';
+                    sessionInfo.appendChild(emptyDiv);
+                }
+            } else if (currentCount === maxDivCount) {
+                // No extra rows needed, but existing data may still be off‑center
+                const nonEmptyDivs = allDivs.filter(div => {
+                    const t = div.textContent.trim();
+                    return t !== '' && t !== '\u00A0';
+                });
+
+                if (nonEmptyDivs.length > 0 && nonEmptyDivs.length < maxDivCount) {
+                    const firstIdx = allDivs.indexOf(nonEmptyDivs[0]);
+                    const lastIdx = allDivs.indexOf(nonEmptyDivs[nonEmptyDivs.length - 1]);
+                    const emptyAbove = firstIdx;
+                    const emptyBelow = maxDivCount - 1 - lastIdx;
+                    const totalEmpty = emptyAbove + emptyBelow;
+                    const targetEmptyAbove = Math.floor(totalEmpty / 2);
+                    const divsToMove = emptyAbove - targetEmptyAbove;
+
+                    if (divsToMove > 0) {
+                        // Move empty divs from top to bottom
+                        for (let i = 0; i < divsToMove; i++) {
+                            const first = sessionInfo.firstChild;
+                            if (first && first.textContent.trim() === '') {
+                                sessionInfo.appendChild(first);
+                            } else {
+                                break;
+                            }
+                        }
+                    } else if (divsToMove < 0) {
+                        // Move empty divs from bottom to top
+                        for (let i = 0; i < Math.abs(divsToMove); i++) {
+                            const last = sessionInfo.lastChild;
+                            if (last && last.textContent.trim() === '') {
+                                sessionInfo.insertBefore(last, sessionInfo.firstChild);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         });
     }
@@ -5085,7 +5148,7 @@
                         };
 
                         if (results.length > 0) {
-                            
+
                             const r = results[0];
                             console.log(r.tpsAvg);
                             const comp1 = formatNumeric(r.movesAvg);
