@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.4
+// @version      3.24.5
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -6250,7 +6250,7 @@
                                     grace: '5%'
                                 }
                             },
-                            layout: { padding: { top: 20 } },
+                            layout: { padding: { top: 20, left: 30, right: 30 } },
                             onClick: function (e, elements, chart) {
                                 const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
                                 if (points.length) {
@@ -6339,6 +6339,7 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             devicePixelRatio: 2,
+                            layout: { padding: { top: 30 } },
                             plugins: {
                                 legend: { display: false },
                                 tooltip: {
