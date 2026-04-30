@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.13.1
+// @version      3.14.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -689,7 +689,7 @@
     controls.className = 'slidy-controls';
 
     const dropdownBtn = document.createElement('button');
-    dropdownBtn.textContent = '🖼️';
+    dropdownBtn.textContent = '🎨';
     dropdownBtn.title = 'Settings';
     dropdownBtn.className = 'slidy-dropdown-btn';
 
@@ -708,7 +708,7 @@
 
     // Cursor upload/remove buttons
     const cursorUploadBtn = document.createElement('button');
-    cursorUploadBtn.textContent = '🖱️ Upload Cursor';
+    cursorUploadBtn.textContent = '📁 Upload Cursor';
     cursorUploadBtn.className = 'slidy-action-btn';
 
     const cursorRemoveBtn = document.createElement('button');
@@ -1544,20 +1544,20 @@
     // 1. CREATE GROUPS FIRST
     // ------------------------------
 
-    const bgGroup = createGroup('Background settings', [
+    const bgGroup = createGroup('🖼️ Background settings', [
         uploadBtn,
         removeBtn,
         bgDimSetting.container,
         bgBlurSetting.container
     ]);
 
-    const cursorGroup = createGroup('Cursor settings', [
+    const cursorGroup = createGroup('🖱️ Cursor settings', [
         cursorUploadBtn,
         cursorRemoveBtn,
         cursorEnabledSetting.container,
     ]);
 
-    const opacityGroup = createGroup('Opacity settings', [
+    const opacityGroup = createGroup('🪟 Opacity settings', [
         uiOpacitySetting.container,
         puzzleDimSetting.container,
         inactiveBrightnessSetting.container,
@@ -1571,19 +1571,18 @@
     ]);
     hiddenPuzzlePosGroup.style.display = 'none';
 
-    const borderGroup = createGroup('Border settings', [
+    const borderGroup = createGroup('🔲 Border settings', [
         borderWidthSetting.container,
         gridsBorderWidthSetting.container
     ]);
 
-    const fontGroup = createGroup('Font settings', [
+    const fontGroup = createGroup('1️⃣ Font settings', [
         fontFamilySetting.container,
         fontSizeSetting.container,
         boldSetting.container
     ]);
 
-
-    const soundGroup = createGroup('Experimental settings (⚠️ May cause lag)', [
+    const soundGroup = createGroup('⚠️ Experimental settings (may cause lag)', [
         base9Setting.container,
         soundEnableSetting.container,
         soundVolumeSetting.container,
@@ -1591,20 +1590,20 @@
         rawHardwareInputSetting.container
     ]);
 
-    const miscGroup = createGroup('Simplify layout', [
+    const miscGroup = createGroup('🧩 Layout settings', [
         puzzleAlwaysInCenterSetting.container,
         minimizeAvgsSetting.container,
         minimizeSessionsSetting.container,
         hideHeaderDuringSolvesSetting.container
     ]);
 
-    const statsGroup = createGroup('Stats settings', [
+    const statsGroup = createGroup('📊 Stats settings', [
         statsAveragesSetting.container,
         statsGraphsSetting.container,
         statsReplaysSetting.container
     ]);
 
-    const resetGroup = createGroup("Manage settings", [
+    const resetGroup = createGroup('♻️ Manage settings', [
         resetBtn
     ]);
 
@@ -1671,7 +1670,7 @@
         dragHandle.addEventListener('touchstart', onDragStart, { passive: false });
 
         isEditingMode = true;
-        adjustButton.textContent = 'Done';
+        adjustButton.textContent = '✅ Done';
     }
 
     function exitEditMode() {
@@ -1687,7 +1686,7 @@
         document.removeEventListener('touchend', onDragEnd);
 
         isEditingMode = false;
-        adjustButton.textContent = 'Adjust';
+        adjustButton.textContent = '✥ Adjust';
     }
 
     let startX, startY, startLeft, startTop;
@@ -1780,14 +1779,14 @@
         betterLBButton.addEventListener('click', openLeaderboard);
 
         adjustButton = document.createElement('button');
-        adjustButton.textContent = 'Adjust';
+        adjustButton.textContent = '✥ Adjust';
         adjustButton.id = 'adjust-puzzle-button';
         adjustButton.className = 'slidy-see-stats-btn';
         adjustButton.style.display = 'none';
         adjustButton.addEventListener('click', toggleEditingMode);
 
         toggleCenterButton = document.createElement('button');
-        toggleCenterButton.textContent = 'Center';
+        toggleCenterButton.textContent = '➕ Center';
         toggleCenterButton.id = 'toggle-center-button';
         toggleCenterButton.className = 'slidy-see-stats-btn';
         toggleCenterButton.style.display = 'none';
@@ -2702,7 +2701,7 @@
 
     function createSeeStatsButton() {
         const button = document.createElement('button');
-        button.textContent = 'Stats';
+        button.textContent = '📊 Stats';
         button.id = 'see-stats-button';
         button.className = 'slidy-see-stats-btn';
 
@@ -2781,10 +2780,10 @@
         const hasStatsTable = document.querySelector('.session-statistics-table');
 
         if (hasPuzzle) {
-            button.textContent = 'Stats';
+            button.textContent = '📊 Stats';
             button.style.display = 'block';
         } else if (hasStatsTable) {
-            button.textContent = 'Back';
+            button.textContent = '🔙 Back';
             button.style.display = 'block';
         } else {
             button.style.display = 'none';
