@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.20.0
+// @version      3.21.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -5694,7 +5694,8 @@
             const variance = sorted.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / sorted.length;
             const stdDev = Math.sqrt(variance);
 
-            const rawLowerBound = Math.max(0, mean - 2 * stdDev);
+            //const rawLowerBound = Math.max(0, mean - 2 * stdDev);
+            const rawLowerBound = Math.min(...values) - 0.0001; // Include the minimum value in the range
             const rawUpperBound = mean + 2 * stdDev;
 
             let niceBinSize = binSize;
