@@ -2880,23 +2880,6 @@
         }
     }
 
-    function fixZoom() {
-        const container = document.querySelector('.puzzle-container');
-        if (!container) return;
-        let currentZoom = parseFloat(container.style.getPropertyValue('--zoom-factor'));
-        if (isNaN(currentZoom)) return;
-        
-        // Convert to hundredths using integer math
-        const currentHundredths = Math.round(currentZoom * 100);
-        const roundedHundredths = Math.round(currentHundredths / 4) * 4;
-        const clampedHundredths = Math.min(500, Math.max(0, roundedHundredths));
-        const clampedZoom = clampedHundredths / 100;
-        
-        console.log(`Original: ${currentZoom}, Fixed: ${clampedZoom}`);
-        
-        container.style.setProperty('--zoom-factor', clampedZoom);
-    }
-
     // ==================== MAIN MUTATION OBSERVER ====================
 
     function preventMutationSpam(mutations) {
@@ -3037,12 +3020,22 @@
         }
     }
 
-    // Event listener for Page Down and Page Up
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'PageDown' || e.key === 'PageUp') {
-            setTimeout(fixZoom, 0);
-        }
-    });
+function stepZoom(dir) {
+    const el = document.querySelector('.puzzle-container');
+    if (!el) return;
+    const raw = parseFloat(getComputedStyle(el).getPropertyValue('--zoom-factor'));
+    let z = Math.round((isNaN(raw) ? 1 : raw) * 100);
+    z = Math.round(z / 4) * 4;
+    z += dir * 4;
+    if (z < 4) z = 4;
+    const out = (z / 100).toFixed(2);
+    el.style.setProperty('--zoom-factor', out);
+}
+
+window.addEventListener('keydown', e => {
+    if (e.key === 'PageUp') setTimeout(() => stepZoom(+1), 0);
+    if (e.key === 'PageDown') setTimeout(() => stepZoom(-1), 0);
+});
 
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
