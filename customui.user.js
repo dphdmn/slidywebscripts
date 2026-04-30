@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.14.0
+// @version      3.14.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -2815,24 +2815,36 @@
     }
 
     function detectPuzzleState(mutations) {
-        const firstMutation = mutations[0];
-        const isStyleReset = firstMutation.type === 'childList' &&
-            firstMutation.target.tagName === 'STYLE';
+        let sawStatsUpdate = false;
+        let puzzleChanged = false;
 
-        if (!isStyleReset) return "unknown";
+        for (const m of mutations) {
+            const target = m.target;
 
-        // Check for session average update - the definitive marker of a finished solve
-        for (let i = 0; i < mutations.length; i++) {
-            const m = mutations[i];
-            if (m.type === 'childList' && m.target.tagName === 'TD') {
-                const addedText = m.addedNodes[0]?.textContent || '';
-                if (addedText.includes('Session')) {
-                    return "finished";
+            if (m.type === 'childList' && target.nodeName?.toLowerCase() === 'td') {
+                for (const node of m.addedNodes) {
+                    const text = node.textContent || '';
+
+                    if (text.includes('Session')) {
+                        sawStatsUpdate = true;
+                    }
                 }
+            }
+
+            if (m.type === 'childList' && target.classList?.contains('puzzle')) {
+                puzzleChanged = true;
             }
         }
 
-        return "scrambled";
+        if (sawStatsUpdate) {
+            return "finished";
+        }
+
+        if (puzzleChanged) {
+            return "scrambled";
+        }
+
+        return "unknown";
     }
 
     const logMutationDetails = (mutations) => {
@@ -2931,6 +2943,7 @@
         //console.log('Mutations observed:', mutations.length);
         //logMutationDetails(mutations);
         const state = detectPuzzleState(mutations);
+        //console.log(state);
         const hideHeaderDuringSolves = getSetting('hideHeaderDuringSolves');
         if (state === "scrambled") {
             unlockKeys();
