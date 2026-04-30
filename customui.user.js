@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.3
+// @version      3.24.4
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -5877,7 +5877,7 @@
             const stdDev = Math.sqrt(variance);
 
             //const rawLowerBound = Math.max(0, mean - 2 * stdDev);
-            const rawLowerBound = Math.min(...values) - 0.0001; // Include the minimum value in the range
+            const rawLowerBound = Math.max(0, Math.min(...values) - 0.0001); // Include the minimum value in the range
             const rawUpperBound = mean + 2 * stdDev;
 
             let niceBinSize = binSize;
@@ -6245,6 +6245,8 @@
                                             return value.toFixed(category === 'moves' ? 0 : 2);
                                         }
                                     },
+                                    beginAtZero: true,
+                                    min: 0,
                                     grace: '5%'
                                 }
                             },
@@ -6383,7 +6385,8 @@
                             scales: {
                                 x: {
                                     grid: { color: 'rgba(80, 80, 80, 0.3)' },
-                                    ticks: { color: '#aaa', maxRotation: 45, font: { size: 9 } }
+                                    ticks: { color: '#aaa', maxRotation: 45, font: { size: 9 } },
+                                    min: 0
                                 },
                                 y: {
                                     grid: { color: 'rgba(80, 80, 80, 0.3)' },
