@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.13.0
+// @version      3.13.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -2071,7 +2071,7 @@
         const element = document.querySelector('.focus-area');
         if (!element) return;
 
-        console.log("overwriting inputs");
+        //console.log("overwriting inputs");
 
         const listener = __listenerStore.get(element);
         if (!listener) return;
