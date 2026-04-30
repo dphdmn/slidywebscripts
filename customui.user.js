@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.21.0
+// @version      3.22.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4244,9 +4244,10 @@
 
             function getTrimCount(ruleStr, N, customVal) {
                 if (N < 3) return 0;
-                if (N < 13) return 1;
+                if (ruleStr !== '0' && N < 13) return 1;
                 let trim = 1;
-                if (ruleStr === '1') trim = 1;
+                if (ruleStr === '0') trim = 0;
+                else if (ruleStr === '1') trim = 1;
                 else if (ruleStr === '5%') trim = Math.ceil(0.05 * N);
                 else if (ruleStr === '10%') trim = Math.ceil(0.10 * N);
                 else if (ruleStr === 'custom') {
@@ -4294,7 +4295,7 @@
 
                 for (let sizeIdx = 0; sizeIdx < avgSizes.length; sizeIdx++) {
                     const size = avgSizes[sizeIdx];
-                    if (size > n || size < 3) continue;
+                    if (size > n || (size < 3 && trimRule !== '0')) continue;
                     const trimEach = getTrimCount(trimRule, size, customTrim);
                     if (trimEach * 2 >= size) continue;
 
@@ -4670,11 +4671,16 @@
                 if (isFMC) {
                     tpsVal = (movesVal !== DNF_MOVES && timeVal !== DNF_TIME && timeVal > 0) ? Math.round((movesVal / timeVal) * 1000) / 1000 : DNF_TPS_BAD;
                 } else {
-                    tpsVal = parseFloat(tpsText);
+                    if (tpsText === "∞") {
+                        tpsVal = Infinity;
+                    } else {
+                        tpsVal = parseFloat(tpsText);
+                    }
                     if (isNaN(tpsVal) || tpsText === 'DNF') tpsVal = DNF_TPS_BAD;
                 }
 
                 const formatNumeric = (value) => {
+                    if (value === Infinity) return '∞';
                     if (value === null) return 'DNF';
                     return (Math.floor(value * 1000) / 1000).toFixed(3);
                 };
@@ -4741,8 +4747,9 @@
 
         function getSelectedAvgSizes() {
             const selected = document.querySelector('input[name="avgSet"]:checked')?.value || 'major100';
+            const trimRule = document.querySelector('input[name="trimRule"]:checked')?.value || '5%';
             if (selected === 'all') {
-                return [
+                const sizes = [
                     4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                     21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
                     41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
@@ -4750,6 +4757,10 @@
                     81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100,
                     200, 250, 500, 1000, 2000, 2500, 5000, 10000
                 ];
+                if (trimRule === '0') {
+                    return [2, 3, ...sizes];
+                }
+                return sizes;
             } else if (selected === 'major') {
                 return [5, 12, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
             } else {
@@ -4940,7 +4951,8 @@
                         if (result === "NO AVERAGE") {
                             return `${currentStreak}`;
                         }
-                        return `ao${currentStreak}: ${result}`;
+                        const prefix = document.querySelector('input[name="trimRule"]:checked')?.value === '0' ? 'mo' : 'ao';
+                        return `${prefix}${currentStreak}: ${result}`;
                     } catch (error) {
                         console.error('Failed to calculate average:', error);
                         return `${currentStreak} (error occured)`;
@@ -5067,12 +5079,15 @@
                         };
 
                         const formatNumeric = (value) => {
+                            if (value === Infinity) return '∞';
                             if (value === null) return 'DNF';
                             return (Math.floor(value * 1000) / 1000).toFixed(3);
                         };
 
                         if (results.length > 0) {
+                            
                             const r = results[0];
+                            console.log(r.tpsAvg);
                             const comp1 = formatNumeric(r.movesAvg);
                             const comp2 = formatNumeric(r.tpsAvg);
                             const mainFormatted = formatTimeValue(r.mainAvg);
@@ -5174,6 +5189,7 @@
                         };
 
                         const formatNumeric = (value) => {
+                            if (value === Infinity) return '∞';
                             if (value === null) return 'DNF';
                             return (Math.floor(value * 1000) / 1000).toFixed(3);
                         };
@@ -5197,9 +5213,13 @@
                             }
 
                             const ts = formatTimestamp(r.timestamp);
-                            const outText = r.trimEach === 1 ? '1 out' : `${r.trimEach} out`;
                             const range = `${r.startId}-${r.endId}`;
-                            lines.push(`ao${r.size}: ${mainFormatted} (${comp1}/${comp2}) | ${ts} (${outText}) (${range})`);
+                            if (r.trimEach === 0) {
+                                lines.push(`mo${r.size}: ${mainFormatted} (${comp1}/${comp2}) | ${ts} (${range})`);
+                            } else {
+                                const outText = r.trimEach === 1 ? '1 out' : `${r.trimEach} out`;
+                                lines.push(`ao${r.size}: ${mainFormatted} (${comp1}/${comp2}) | ${ts} (${outText}) (${range})`);
+                            }
                         }
 
                         if (outputArea) outputArea.value = lines.length ? lines.join('\n') : 'No valid averages (or DNF everywhere).';
@@ -5227,7 +5247,8 @@
                 };
 
                 const formatNumeric = (value) => {
-                    if (value < 0) return "inf";
+                    if (value === Infinity) return '∞';
+                    if (value < 0) return "∞";
                     if (value === null || isNaN(value)) return 'DNF';
                     return (Math.floor(value * 1000) / 1000).toFixed(3);
                 };
@@ -5410,6 +5431,9 @@
                                 <div class="avgs-filter-row">
                                     <span class="avgs-control-label">Outliers:</span>
                                     <div class="avgs-radio-group">
+                                        <label class="avgs-radio-label">
+                                            <input type="radio" name="trimRule" value="0"> 0 (mean)
+                                        </label>
                                         <label class="avgs-radio-label">
                                             <input type="radio" name="trimRule" value="1"> 1 (exe)
                                         </label>
