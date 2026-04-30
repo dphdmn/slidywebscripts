@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.17.1
+// @version      3.18.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3020,6 +3020,21 @@
         }
     }
 
+    function setMaxSize() {
+        const focus = document.querySelector('.focus-container');
+        const puzzle = document.querySelector('.puzzle-container');
+        if (!focus || !puzzle) return;
+        const focusH = focus.getBoundingClientRect().height;
+        const puzzleH = puzzle.getBoundingClientRect().height;
+        let raw = parseFloat(getComputedStyle(puzzle).getPropertyValue('--zoom-factor'));
+        let z = Math.round((isNaN(raw) ? 1 : raw) * 100);
+        z = Math.round(z / 4) * 4;
+        const maxZ = Math.floor((focusH / puzzleH) * z);
+        const finalZ = Math.max(4, Math.floor(maxZ / 4) * 4);
+        const finalZoom = finalZ / 100;
+        puzzle.style.setProperty('--zoom-factor', finalZoom.toFixed(2));
+    }
+
     function stepZoom(dir) {
         const el = document.querySelector('.puzzle-container');
         if (!el) return;
@@ -3035,6 +3050,7 @@
     window.addEventListener('keydown', e => {
         if (e.key === 'PageUp') setTimeout(() => stepZoom(+1), 0);
         if (e.key === 'PageDown') setTimeout(() => stepZoom(-1), 0);
+        if (e.key === 'End') setTimeout(() => setMaxSize(), 0);
     });
 
     const mainObserver = new MutationObserver((mutations) => {
