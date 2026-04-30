@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.23.0
+// @version      3.23.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1445,7 +1445,7 @@
     // Minimize avgs
     const minimizeAvgsSetting = createSetting({
         id: 'minimize-avgs',
-        label: 'Minimize avgs',
+        label: 'Minimize timer / avgs',
         type: 'checkbox',
         defaultValue: DEFAULT_CONFIG.minimizeAvgs,
         storageKey: STORAGE_KEYS.minimizeAvgs,
@@ -1460,7 +1460,7 @@
     // Minimize sessions
     const minimizeSessionsSetting = createSetting({
         id: 'minimize-sessions',
-        label: 'Minimize sessions',
+        label: 'Minimize sessions list',
         type: 'checkbox',
         defaultValue: DEFAULT_CONFIG.minimizeSessions,
         storageKey: STORAGE_KEYS.minimizeSessions,
@@ -1555,7 +1555,7 @@
     // Stats: Replays
     const statsReplaysSetting = createSetting({
         id: 'stats-replays',
-        label: 'Replays',
+        label: 'Integrated replays on click',
         type: 'checkbox',
         checked: DEFAULT_CONFIG.statsReplays,
         storageKey: STORAGE_KEYS.statsReplays,
