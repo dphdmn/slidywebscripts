@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.0
+// @version      3.24.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1659,7 +1659,10 @@
     ]);
 
     const resetGroup = createGroup('♻️ Manage settings', [
-        resetBtn
+        resetBtn,
+        createSectionLabel('Tip: Press End to reset or maximize puzzle size'),
+        createSectionLabel('Tip: Press Alt+Enter for Zen mode while solving'),
+
     ]);
 
     // ------------------------------
