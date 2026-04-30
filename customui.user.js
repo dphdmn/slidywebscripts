@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.14.3
+// @version      3.15.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -108,7 +108,8 @@
         statsReplays: true,
         // Custom cursor
         cursorEnabled: true,
-        rawHardwareInput: false
+        rawHardwareInput: false,
+        borderRadius: 0
     };
 
     const STORAGE_KEYS = {
@@ -142,7 +143,8 @@
         statsReplays: 'slidysim_dph_script_stats_replays',
         // Custom cursor
         cursorEnabled: 'slidysim_dph_script_cursor_enabled',
-        rawHardwareInput: 'slidysim_dph_script_raw_hardware_input'
+        rawHardwareInput: 'slidysim_dph_script_raw_hardware_input',
+        borderRadius: 'slidysim_dph_script_border_radius'
     };
 
     // Settings that should be parsed as floats even if their defaults are integers
@@ -1340,6 +1342,21 @@
     });
     settings.bold = boldSetting;
 
+    // Border radius
+    const borderRadiusSetting = createSetting({
+        id: 'border-radius',
+        label: 'Rounded Corners',
+        type: 'slider',
+        defaultValue: DEFAULT_CONFIG.borderRadius,
+        storageKey: STORAGE_KEYS.borderRadius,
+        unit: 'px',
+        min: '0',
+        max: '40',
+        step: '1',
+        onChange: (val) => applyBorderRadius(parseInt(val))
+    });
+    settings.borderRadius = borderRadiusSetting;
+
     // Inactive grids brightness
     const inactiveBrightnessSetting = createSetting({
         id: 'inactive-brightness',
@@ -1606,7 +1623,8 @@
 
     const borderGroup = createGroup('🔲 Border settings', [
         borderWidthSetting.container,
-        gridsBorderWidthSetting.container
+        gridsBorderWidthSetting.container,
+        borderRadiusSetting.container
     ]);
 
     const fontGroup = createGroup('1️⃣ Font settings', [
@@ -2213,6 +2231,17 @@
         styleEl.textContent = `.piece .text { font-size: ${size}px !important; }`;
     }
 
+    function applyBorderRadius(radius) {
+        const styleId = 'slidysim-border-radius-style';
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = `.piece { border-radius: ${radius}px !important; }`;
+    }
+
     function applyBold(isBold) {
         const styleId = 'slidysim-font-bold-style';
         let styleEl = document.getElementById(styleId);
@@ -2604,6 +2633,10 @@
         const savedBold = getSetting('bold');
         boldSetting.setValue(savedBold);
         applyBold(savedBold);
+
+        const savedBorderRadius = getSetting('borderRadius');
+        borderRadiusSetting.setValue(savedBorderRadius);
+        applyBorderRadius(savedBorderRadius);
 
         // Restore inactive brightness
         const savedInactiveBrightness = getSetting('inactiveBrightness');
