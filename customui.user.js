@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.24.5
+// @version      3.24.6
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -253,6 +253,34 @@
             min-width: 80px;
         }
 
+        .slidy-see-stats-btn {
+            display: none;
+            min-width: 30px;
+            margin-left: 5px;
+            padding: 6px 16px;
+            background: rgba(60,60,60,0.9);
+            color: white;
+            border: 1px solid #666;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            max-height: 30px;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .slidy-see-stats-btn:hover {
+            background: rgba(80,80,80,0.95);
+            border-color: #888;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            max-height: 30px;
+        }
+
         .slidy-slider { width: 140px; height: 4px; cursor: pointer; }
 
         .slidy-slider-value { color: #ccc; font-size: 11px; min-width: 30px; }
@@ -288,29 +316,6 @@
 
         .slidy-file-input { display: none; }
         .slidy-cursor-file-input { display: none; }
-
-        .slidy-see-stats-btn {
-            display: none;
-            min-width: 50px;
-            margin-left: 5px;
-            padding: 6px 16px;
-            background: rgba(60,60,60,0.9);
-            color: white;
-            border: 1px solid #666;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .slidy-see-stats-btn:hover {
-            background: rgba(80,80,80,0.95);
-            border-color: #888;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
 
         .slidy-drag-handle {
             position: absolute;
@@ -1832,6 +1837,7 @@
         // Better LB button
         const betterLBButton = document.createElement('button');
         betterLBButton.textContent = 'Better LB';
+        betterLBButton.style.whiteSpace = 'nowrap';
         betterLBButton.className = 'tab';
         betterLBButton.style.color = 'rgb(100, 255, 255)';
         betterLBButton.addEventListener('click', openLeaderboard);
@@ -2840,7 +2846,7 @@
 
     function createSeeStatsButton() {
         const button = document.createElement('button');
-        button.textContent = '📊 Stats';
+        button.textContent = '📊';
         button.id = 'see-stats-button';
         button.className = 'slidy-see-stats-btn';
 
@@ -2919,10 +2925,10 @@
         const hasStatsTable = document.querySelector('.session-statistics-table');
 
         if (hasPuzzle) {
-            button.textContent = '📊 Stats';
+            button.textContent = '📊';
             button.style.display = 'block';
         } else if (hasStatsTable) {
-            button.textContent = '🔙 Back';
+            button.textContent = '⬅️ Back';
             button.style.display = 'block';
         } else {
             button.style.display = 'none';
