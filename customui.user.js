@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.19.0
+// @version      3.20.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4407,8 +4407,8 @@
                     if (bestMain < Infinity) {
                         results.push({
                             size,
-                            mainSum: bestMain,
-                            compSum: bestComp,
+                            mainSum: bestMain / 1000,
+                            compSum: bestComp / 1000,
                             tps: Math.round((isTime ? bestComp / bestMain : bestMain / bestComp) * 1000) / 1000,
                             startId: ids[bestStart],
                             endId: ids[bestStart + size - 1]
@@ -4885,6 +4885,7 @@
 
             let currentStreak = 0;
 
+
             filteredSolves.forEach(solve => {
                 if (!solve.isDNF) {
                     totalSolvingSeconds += solve.time;
@@ -4932,55 +4933,74 @@
                 return `${mainValue} (${comp1} / ${comp2})`;
             };
 
-            const statsHtml = `
-                <div class="avgs-session-stats">
-                    <div class="avgs-session-stats-title">📈 Session Statistics (filtered)</div>
-                    <div class="avgs-session-stats-grid">
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Session started:</span>
-                            <span class="avgs-stat-value">${formatTimestamp(sessionStartTime)}</span>
-                        </div>
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Session ended:</span>
-                            <span class="avgs-stat-value">${formatTimestamp(sessionEndTime)}</span>
-                        </div>
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Session duration:</span>
-                            <span class="avgs-stat-value">${formatDuration(sessionDurationSeconds)}</span>
-                        </div>
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Total solving time:</span>
-                            <span class="avgs-stat-value">${formatTimeFromSeconds(totalSolvingSeconds)}</span>
-                        </div>
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Total moves done:</span>
-                            <span class="avgs-stat-value">${totalMoves}</span>
-                        </div>
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Total attempts done:</span>
-                            <span class="avgs-stat-value">${totalSolves}</span>
-                        </div>
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Total solves done:</span>
-                            <span class="avgs-stat-value">${completedSolves}</span>
-                        </div>
-                        <div class="avgs-stat-item">
-                            <span class="avgs-stat-label">Current no-reset streak:</span>
-                            <span class="avgs-stat-value">${currentStreak}</span>
-                        </div>
-                    </div>
-                    <div class="avgs-best-solves">
-                        <div class="avgs-best-solve-item">Best Time: ${formatBestSolve(bestTimeSolve, 'time')}</div>
-                        <div class="avgs-best-solve-item">Best Moves: ${formatBestSolve(bestMovesSolve, 'moves')}</div>
-                        <div class="avgs-best-solve-item">Best TPS: ${formatBestSolve(bestTpsSolve, 'tps')}</div>
-                    </div>
-                </div>
-            `;
+            const getStreakDisplay = async () => {
+                if (currentStreak > 2) {
+                    try {
+                        const result = await getFullAverage(filteredSolves.slice(-currentStreak));
+                        if (result === "NO AVERAGE") {
+                            return `${currentStreak}`;
+                        }
+                        return `ao${currentStreak}: ${result}`;
+                    } catch (error) {
+                        console.error('Failed to calculate average:', error);
+                        return `${currentStreak} (error occured)`;
+                    }
+                } else {
+                    return Promise.resolve(`${currentStreak}`);
+                }
+            };
 
-            if (sessionStatsDiv) {
-                sessionStatsDiv.outerHTML = statsHtml;
-                sessionStatsDiv = document.querySelector('.avgs-session-stats');
-            }
+            getStreakDisplay().then(streakDisplay => {
+                const statsHtml = `
+        <div class="avgs-session-stats">
+            <div class="avgs-session-stats-title">📈 Session Statistics (filters apply)</div>
+            <div class="avgs-session-stats-grid">
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Session started:</span>
+                    <span class="avgs-stat-value">${formatTimestamp(sessionStartTime)}</span>
+                </div>
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Session ended:</span>
+                    <span class="avgs-stat-value">${formatTimestamp(sessionEndTime)}</span>
+                </div>
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Session duration:</span>
+                    <span class="avgs-stat-value">${formatDuration(sessionDurationSeconds)}</span>
+                </div>
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Total solving time:</span>
+                    <span class="avgs-stat-value">${formatTimeFromSeconds(totalSolvingSeconds)}</span>
+                </div>
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Total moves done:</span>
+                    <span class="avgs-stat-value">${totalMoves}</span>
+                </div>
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Total attempts done:</span>
+                    <span class="avgs-stat-value">${totalSolves}</span>
+                </div>
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Total solves done:</span>
+                    <span class="avgs-stat-value">${completedSolves}</span>
+                </div>
+                <div class="avgs-stat-item">
+                    <span class="avgs-stat-label">Current no-reset streak:</span>
+                    <span class="avgs-stat-value">${streakDisplay}</span>
+                </div>
+            </div>
+            <div class="avgs-best-solves">
+                <div class="avgs-best-solve-item">Best Time: ${formatBestSolve(bestTimeSolve, 'time')}</div>
+                <div class="avgs-best-solve-item">Best Moves: ${formatBestSolve(bestMovesSolve, 'moves')}</div>
+                <div class="avgs-best-solve-item">Best TPS: ${formatBestSolve(bestTpsSolve, 'tps')}</div>
+            </div>
+        </div>
+    `;
+
+                if (sessionStatsDiv) {
+                    sessionStatsDiv.outerHTML = statsHtml;
+                    sessionStatsDiv = document.querySelector('.avgs-session-stats');
+                }
+            });
         }
 
         function getReplayType(solves) {
@@ -5009,6 +5029,75 @@
             });
         }
 
+        function getFullAverage(solves) {
+            return new Promise((resolve, reject) => {
+                const trimRule = document.querySelector('input[name="trimRule"]:checked')?.value || '5%';
+                const customTrim = document.querySelector('#customTrimInput')?.value || '2';
+                const killBtn = document.querySelector('.avgs-kill-btn');
+                if (killBtn) killBtn.style.display = 'block';
+                if (currentWorker) {
+                    currentWorker.terminate();
+                    currentWorker = null;
+                }
+                if (progressBar) progressBar.value = 0;
+                if (progressText) progressText.textContent = '0%';
+                currentWorker = createWorker();
+
+                currentWorker.onmessage = (e) => {
+                    const { type: msgType, progress, results } = e.data;
+                    if (msgType === 'progress') {
+                        if (progressBar) progressBar.value = progress;
+                        if (progressText) progressText.textContent = `${progress}%`;
+                    } else if (msgType === 'result') {
+                        if (progressBar) progressBar.value = 100;
+                        if (progressText) progressText.textContent = 'done';
+                        if (killBtn) killBtn.style.display = 'none';
+
+                        const formatTimeValue = (seconds) => {
+                            if (seconds === null) return 'DNF';
+                            const floored = Math.floor(seconds * 1000) / 1000;
+                            const minutes = Math.floor(floored / 60);
+                            const secs = floored % 60;
+
+                            if (minutes > 0) {
+                                return `${minutes}:${secs.toFixed(3).padStart(6, '0')}`;
+                            } else {
+                                return `${secs.toFixed(3)}`;
+                            }
+                        };
+
+                        const formatNumeric = (value) => {
+                            if (value === null) return 'DNF';
+                            return (Math.floor(value * 1000) / 1000).toFixed(3);
+                        };
+
+                        if (results.length > 0) {
+                            const r = results[0];
+                            const comp1 = formatNumeric(r.movesAvg);
+                            const comp2 = formatNumeric(r.tpsAvg);
+                            const mainFormatted = formatTimeValue(r.mainAvg);
+
+                            currentWorker = null;
+                            resolve(`${mainFormatted} (${comp1}/${comp2})`);
+                        } else {
+                            currentWorker = null;
+                            resolve("NO AVERAGE");
+                        }
+                    }
+                };
+
+                currentWorker.onerror = (e) => {
+                    currentWorker = null;
+                    console.log(e);
+                    reject(e);
+                };
+
+                currentWorker.postMessage({
+                    solves, category: "time", trimRule, customTrim, avgSizes: [solves.length]
+                });
+            });
+        }
+
         function calculateAvgs() {
             const allSolves = extractSolvesFromTable();
             let solves;
@@ -5023,7 +5112,7 @@
             const resetBtn = document.querySelector('.avgs-reset-btn');
             updateFilterSummary();
             if (!useDetailsForStats) {
-                updateSessionStats();
+                // updateSessionStats();
                 solves = filterSolves(allSolves);
                 if (resetBtn) resetBtn.style.display = 'none';
             } else {
@@ -5115,6 +5204,7 @@
 
                         if (outputArea) outputArea.value = lines.length ? lines.join('\n') : 'No valid averages (or DNF everywhere).';
                         currentWorker = null;
+                        updateSessionStats();
                     }
                 };
 
