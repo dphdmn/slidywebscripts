@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.25.0
+// @version      3.25.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -31,12 +31,14 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
-        /* Accessibility */
+        .session-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .focus-area:focus-visible {
             outline: none !important;
         }
-
-        /* Header helper classes */
         .left-hack {
             position: fixed !important;
             top: 0 !important;
@@ -934,6 +936,17 @@
             grid-area: a !important;
             position: relative !important;
         }
+        .module-container {
+            background-color: transparent !important;
+            background: none !important;
+        }
+
+        .piece {
+            outline-width: var(--border-width-puzzle, 0px) !important;
+            outline-style: solid !important;
+            outline-color: var(--border-color-puzzle, transparent) !important;
+            outline-offset: calc(-1 * var(--border-width-puzzle, 0px)) !important;
+        }
     `);
 
     let adjustButton = null;
@@ -1301,33 +1314,7 @@
     let currentBlobUrl = null;
     let currentCursorBlobUrl = null;
 
-
-    async function restoreSettings() {
-        loadStoredSettings();
-
-        Object.keys(settings).forEach(key => {
-            const setting = settings[key];
-            const value = currentConfig[key];
-
-            if (!setting) return;
-
-            if (key === 'cursorEnabled') {
-                if (typeof setting.setValue === 'function') {
-                    setting.setValue(value, { store: true, notify: false });
-                }
-                return;
-            }
-
-            if (typeof setting.restore === 'function') {
-                setting.restore(value);
-            } else if (typeof setting.setValue === 'function') {
-                setting.setValue(value);
-            }
-        });
-
-        // Ensure sound debounce is synced even if onChange did not run
-        soundDebounceTime = currentConfig.soundDebounce;
-
+    async function restoreMedia() {
         // Load background from IndexedDB
         try {
             const blob = await loadFromDB();
@@ -1358,8 +1345,24 @@
         } catch (error) {
             console.error('Failed to load cursor:', error);
         }
+    }
 
-        removeModuleContainerBackground();
+    async function restoreSettings() {
+        loadStoredSettings();
+
+        Object.keys(settings).forEach(key => {
+            const setting = settings[key];
+            const value = currentConfig[key];
+
+            if (!setting) return;
+
+            if (typeof setting.restore === 'function') {
+                setting.restore(value);
+            } else if (typeof setting.setValue === 'function') {
+                setting.setValue(value);
+            }
+        });
+        await restoreMedia();
     }
 
     function openDB() {
@@ -2199,7 +2202,8 @@
         max: '50',
         step: '1',
         onChange: (val) => {
-            soundDebounceTime = parseInt(val);
+            killSound();
+            initSound();
         }
     });
     settings.soundDebounce = soundDebounceSetting;
@@ -2793,7 +2797,6 @@
             mainContainer.style.position = 'relative';
             mainContainer.style.background = 'none';
         }
-        removeModuleContainerBackground();
         const hasBg = !!blobUrl;
         settings.bgDim.container.style.display = 'flex';
         settings.puzzleDim.container.style.display = 'flex';
@@ -2822,14 +2825,6 @@
         }
         deleteFromDB().catch(err => console.error('Failed to delete from DB:', err));
         removeBtn.style.display = 'none';
-    }
-
-    function removeModuleContainerBackground() {
-        const moduleContainers = document.querySelectorAll('.module-container');
-        moduleContainers.forEach(container => {
-            container.style.backgroundColor = 'transparent';
-            container.style.background = 'none';
-        });
     }
 
     function applyPuzzleDim(dimAmount) {
@@ -2945,26 +2940,30 @@
     }
 
     function applyBorder(width, color) {
-        const pieces = document.querySelectorAll('.piece');
-        pieces.forEach(piece => {
-            if (width > 0) {
-                piece.style.boxShadow = `inset 0 0 0 ${width}px ${color}`;
-            } else {
-                piece.style.boxShadow = '';
-            }
-        });
+        const root = document.documentElement;
+
+        if (width > 0) {
+            root.style.setProperty('--border-width-puzzle', `${width}px`);
+            root.style.setProperty('--border-color-puzzle', color);
+        } else {
+            root.style.removeProperty('--border-width-puzzle');
+            root.style.removeProperty('--border-color-puzzle');
+        }
     }
 
     function applyGridsBorder(width, color) {
         const subschemes = document.querySelectorAll('.piece .subscheme');
+        if (subschemes.length === 0) return;
+
+        const bg = getComputedStyle(subschemes[0]).backgroundColor;
+        const hasBackground = bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+
+        const boxShadow = (width > 0 && hasBackground)
+            ? `inset 0 0 0 ${width}px ${color}`
+            : '';
+
         subschemes.forEach(subscheme => {
-            const bg = getComputedStyle(subscheme).backgroundColor;
-            const hasBackground = bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
-            if (width > 0 && hasBackground) {
-                subscheme.style.boxShadow = `inset 0 0 0 ${width}px ${color}`;
-            } else {
-                subscheme.style.boxShadow = '';
-            }
+            subscheme.style.boxShadow = boxShadow;
         });
     }
 
@@ -3066,12 +3065,21 @@
     // ==================== SOUND FUNCTIONALITY ====================
 
     let soundAudio = null;
-    let soundDebounceTime = currentConfig.soundDebounce;
     let soundObserver = null;
+
+    function killSound() {
+        const puzzle = document.querySelector('.puzzle');
+
+        if (puzzle && puzzle._soundObserver) {
+            puzzle._soundObserver.disconnect();
+            puzzle._soundObserver = null;
+        }
+    }
 
     function initSound() {
         const puzzle = document.querySelector('.puzzle');
         const volume = currentConfig.soundVolume;
+        const soundDebounceTime = currentConfig.soundDebounce;
 
         if (!puzzle || (volume < 0.02)) {
             return;
@@ -3775,7 +3783,6 @@
     }
 
     function formatSingleSolve(finished) {
-        console.log(finished);
         const container = document.querySelector('.stats-grid-container');
         if (!container) return;
         const tds = container.querySelectorAll('tr[avg="1"] td');
@@ -3804,7 +3811,6 @@
         if (preventMutationSpam(mutations)) return;
         //console.log('Mutations observed:', mutations.length);
         //logMutationDetails(mutations);
-        //fixZoom();
         const state = detectPuzzleState(mutations);
         //console.log(state);
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
@@ -3834,7 +3840,6 @@
         if (!isEditingMode && !positionApplied && settings.puzzleAlwaysInCenter && settings.puzzleAlwaysInCenter.getValue()) {
             toggleCenterPosition();
         }
-        removeModuleContainerBackground();
         applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
 
         if (currentConfig.minimizeAvgs || isZenMode) {
@@ -3869,22 +3874,12 @@
             }
         }
 
-        if (currentBlobUrl) {
-            const mainContainer = document.querySelector('.main-content-container');
-            if (mainContainer && !mainContainer.style.background.includes('blob:')) {
-                applyBackground(currentBlobUrl, currentConfig.bgDim);
-            }
-        }
-
-        applyGridsBorder(
-            parseInt(settings.gridsBorderWidth.getValue()),
-            settings.gridsBorderColor.getValue()
-        );
-        applyInactiveBrightness(parseFloat(settings.inactiveBrightness.getValue()));
-        applyBorder(parseInt(settings.borderWidth.getValue()), settings.borderColor.getValue());
-        applyPuzzleDim(parseFloat(settings.puzzleDim.getValue()));
+        applyGridsBorder(currentConfig.gridsBorderWidth, currentConfig.gridsBorderColor);
+        applyInactiveBrightness(currentConfig.inactiveBrightness);
+        applyBorder(currentConfig.borderWidth, currentConfig.borderColor);
+        applyPuzzleDim(currentConfig.puzzleDim);
         addHorizontalScroll();
-        if (settings.rawHardwareInput.getValue()) {
+        if (currentConfig.rawHardwareInput) {
             overwriteInputs();
         } else {
             restoreInputs();
