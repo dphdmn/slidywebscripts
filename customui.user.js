@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.27.0
+// @version      3.27.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3049,10 +3049,10 @@
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (hideHeaderDuringSolves || isZenMode) {
-            if (isCornerMode) {
-                container.classList.toggle('left-hack', scrambled || isZenMode);
-            } else {
-                container.classList.toggle('center-hack', scrambled || isZenMode);
+            container.classList.remove('left-hack', 'center-hack');
+
+            if (scrambled || isZenMode) {
+                container.classList.add(isCornerMode ? 'left-hack' : 'center-hack');
             }
         }
         const thRow = container.querySelector('tr:has(th)');
