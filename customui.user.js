@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.26.0
+// @version      3.26.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1050,8 +1050,6 @@
     let isCornerMode = true;
     let isZenMode = false;
 
-    // ==================== DEFAULT CONFIGURATION ====================
-
     const DEFAULT_CONFIG = {
         bgDim: 0.5,
         bgBlur: 0,
@@ -1077,11 +1075,9 @@
         puzzleAlwaysInCenter: true,
         blankColorOpacity: 0,
         blankColor: '#000000',
-        // New stats features
         statsGraphs: true,
         statsAverages: true,
         statsReplays: true,
-        // Custom cursor
         cursorEnabled: true,
         rawHardwareInput: false,
         borderRadius: 0
@@ -1112,17 +1108,14 @@
         puzzleAlwaysInCenter: 'slidysim_dph_script_puzzle_always_in_center',
         blankColorOpacity: 'slidysim_dph_script_blank_color_opacity',
         blankColor: 'slidysim_dph_script_blank_color',
-        // New stats features
         statsGraphs: 'slidysim_dph_script_stats_graphs',
         statsAverages: 'slidysim_dph_script_stats_averages',
         statsReplays: 'slidysim_dph_script_stats_replays',
-        // Custom cursor
         cursorEnabled: 'slidysim_dph_script_cursor_enabled',
         rawHardwareInput: 'slidysim_dph_script_raw_hardware_input',
         borderRadius: 'slidysim_dph_script_border_radius'
     };
 
-    // Settings that should be parsed as floats even if their defaults are integers
     const FLOAT_SETTINGS = new Set([
         'puzzleDim',
         'bgDim',
@@ -1188,21 +1181,18 @@
         );
     }
 
-    // FIXED: Properly handle initial value display for all unit types
     function updateSliderDisplay(input, valueDisplay, config) {
         if (!valueDisplay) return;
 
         let value = parseFloat(input.value);
         const unit = config.unit || '';
 
-        // Handle percent properly - multiply by 100 for display
         if (unit === '%') {
             value = Math.round(value * 100);
             valueDisplay.textContent = value + '%';
             return;
         }
 
-        // Handle regular units
         if (unit === 'px') {
             value = Math.round(value);
         }
@@ -1210,7 +1200,6 @@
         valueDisplay.textContent = value + unit;
     }
 
-    // Configuration factory for creating menu settings
     function createSetting(config) {
         const {
             id,
@@ -1390,24 +1379,19 @@
         };
     }
 
-    // IndexedDB setup
     const DB_NAME = 'SlidySimBG';
     const DB_VERSION = 1;
     const STORE_NAME = 'backgrounds';
     const BG_KEY = 'custom_bg';
-
-    // Cursor DB
     const CURSOR_DB_NAME = 'SlidySimCursor';
     const CURSOR_STORE_NAME = 'cursors';
     const CURSOR_KEY = 'custom_cursor';
-
     let db = null;
     let cursorDb = null;
     let currentBlobUrl = null;
     let currentCursorBlobUrl = null;
 
     async function restoreMedia() {
-        // Load background from IndexedDB
         try {
             const blob = await loadFromDB();
             if (blob) {
@@ -1420,8 +1404,6 @@
         } catch (error) {
             console.error('Failed to load background:', error);
         }
-
-        // Load cursor from IndexedDB
         try {
             const cursorBlob = await loadCursorFromDB();
             if (cursorBlob) {
@@ -1504,8 +1486,6 @@
         });
     }
 
-    // ==================== CURSOR DATABASE ====================
-
     function openCursorDB() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(CURSOR_DB_NAME, 1);
@@ -1553,8 +1533,6 @@
         });
     }
 
-    // ==================== UI CREATION ====================
-
     const controls = document.createElement('div');
     controls.className = 'slidy-controls';
 
@@ -1566,7 +1544,6 @@
     const dropdownMenu = document.createElement('div');
     dropdownMenu.className = 'slidy-dropdown-menu';
 
-    // Upload/Remove buttons
     const uploadBtn = document.createElement('button');
     uploadBtn.textContent = '📁 Upload Background';
     uploadBtn.className = 'slidy-action-btn';
@@ -1576,7 +1553,6 @@
     removeBtn.className = 'slidy-action-btn';
     removeBtn.style.display = 'none';
 
-    // Cursor upload/remove buttons
     const cursorUploadBtn = document.createElement('button');
     cursorUploadBtn.textContent = '📁 Upload Cursor';
     cursorUploadBtn.className = 'slidy-action-btn';
@@ -1586,7 +1562,6 @@
     cursorRemoveBtn.className = 'slidy-action-btn';
     cursorRemoveBtn.style.display = 'none';
 
-    // Section helper
     function createSectionLabel(text, marginTop = '6px') {
         const label = document.createElement('div');
         label.textContent = text;
@@ -1597,10 +1572,8 @@
         return label;
     }
 
-    // Create all settings using the factory
     const settings = {};
 
-    // Background dim
     const bgDimSetting = createSetting({
         id: 'bg-dim',
         label: 'Background Dim',
@@ -1618,7 +1591,6 @@
     });
     settings.bgDim = bgDimSetting;
 
-    // Background blur
     const bgBlurSetting = createSetting({
         id: 'bg-blur',
         label: 'Background Blur',
@@ -1635,7 +1607,6 @@
     });
     settings.bgBlur = bgBlurSetting;
 
-    // Puzzle dim
     const puzzleDimSetting = createSetting({
         id: 'puzzle-dim',
         label: 'Puzzle Opacity',
@@ -1650,7 +1621,6 @@
     });
     settings.puzzleDim = puzzleDimSetting;
 
-    // Blank color opacity
     const blankColorOpacitySetting = createSetting({
         id: 'blank-color-opacity',
         label: 'Blank Opacity',
@@ -1665,7 +1635,6 @@
     });
     settings.blankColorOpacity = blankColorOpacitySetting;
 
-    // Blank color picker
     const blankColorSetting = createSetting({
         id: 'blank-color',
         label: 'Blank Color',
@@ -1676,7 +1645,6 @@
     });
     settings.blankColor = blankColorSetting;
 
-    // UI opacity
     const uiOpacitySetting = createSetting({
         id: 'ui-opacity',
         label: 'UI Opacity',
@@ -1691,7 +1659,6 @@
     });
     settings.uiOpacity = uiOpacitySetting;
 
-    // NEW: Puzzle container left position slider
     const puzzleLeftSetting = createSetting({
         id: 'puzzle-left',
         label: 'Puzzle Left',
@@ -1706,7 +1673,6 @@
     });
     settings.puzzleLeft = puzzleLeftSetting;
 
-    // NEW: Puzzle container right position slider
     const puzzleTopSetting = createSetting({
         id: 'puzzle-top',
         label: 'Puzzle Top',
@@ -1721,7 +1687,6 @@
     });
     settings.puzzleTop = puzzleTopSetting;
 
-    // Border width
     const borderWidthSetting = createSetting({
         id: 'border-width',
         label: 'Puzzle Border',
@@ -1736,7 +1701,6 @@
     });
     settings.borderWidth = borderWidthSetting;
 
-    // Border color
     const borderColorSetting = createSetting({
         id: 'border-color',
         label: '',
@@ -1748,7 +1712,6 @@
     settings.borderColor = borderColorSetting;
     borderWidthSetting.container.appendChild(borderColorSetting.input);
 
-    // Grids border width
     const gridsBorderWidthSetting = createSetting({
         id: 'grids-border-width',
         label: 'Grids Border',
@@ -1763,7 +1726,6 @@
     });
     settings.gridsBorderWidth = gridsBorderWidthSetting;
 
-    // Grids border color
     const gridsBorderColorSetting = createSetting({
         id: 'grids-border-color',
         label: '',
@@ -1775,7 +1737,7 @@
     settings.gridsBorderColor = gridsBorderColorSetting;
     gridsBorderWidthSetting.container.appendChild(gridsBorderColorSetting.input);
 
-    // ==================== FONT ACCESS FUNCTIONS ====================
+    // ==================== FONT ====================
 
     // Local Font Access API - gets system fonts using unsafeWindow
     async function getLocalFonts() {
@@ -1866,8 +1828,6 @@
             localFontsLoaded = false;
         }
     }
-
-    // ==================== SEARCHABLE FONT COMBOBOX ====================
 
     function createFontCombobox(config) {
         const {
@@ -2027,7 +1987,8 @@
             }
         }
 
-        // Debounced filter
+        // ==================== FONT STUF ENDS ====================
+
         function debouncedFilter(query) {
             if (debounceTimer) {
                 clearTimeout(debounceTimer);
@@ -2037,14 +1998,12 @@
             }, 150);
         }
 
-        // Input event
         input.addEventListener('input', (e) => {
             debouncedFilter(e.target.value);
             dropdown.classList.add('open');
             input.setAttribute('aria-expanded', 'true');
         });
 
-        // Focus event - show dropdown and load fonts on first interaction
         input.addEventListener('focus', async () => {
             await ensureFontsLoaded();
             dropdown.classList.add('open');
@@ -2052,7 +2011,6 @@
             filterFonts(input.value);
         });
 
-        // Blur event - close dropdown (with delay to allow click)
         input.addEventListener('blur', (e) => {
             setTimeout(() => {
                 if (!dropdown.contains(document.activeElement)) {
@@ -2062,7 +2020,6 @@
             }, 150);
         });
 
-        // Keyboard navigation
         input.addEventListener('keydown', (e) => {
             const options = dropdown.querySelectorAll('.slidy-font-option');
 
@@ -2106,7 +2063,6 @@
             }
         });
 
-        // Scroll highlighted option into view
         function scrollToHighlighted() {
             const options = dropdown.querySelectorAll('.slidy-font-option');
             if (options[highlightedIndex]) {
@@ -2164,7 +2120,6 @@
         };
     }
 
-    // Font family - using searchable combobox
     const fontFamilySetting = createFontCombobox({
         id: 'font-family',
         label: 'Font Family',
@@ -2176,7 +2131,6 @@
     });
     settings.fontFamily = fontFamilySetting;
 
-    // Font size
     const fontSizeSetting = createSetting({
         id: 'font-size',
         label: 'Font Size',
@@ -2191,7 +2145,6 @@
     });
     settings.fontSize = fontSizeSetting;
 
-    // Bold toggle
     const boldSetting = createSetting({
         id: 'bold',
         label: 'Bold',
@@ -2202,7 +2155,6 @@
     });
     settings.bold = boldSetting;
 
-    // Border radius
     const borderRadiusSetting = createSetting({
         id: 'border-radius',
         label: 'Rounded Corners',
@@ -2217,7 +2169,6 @@
     });
     settings.borderRadius = borderRadiusSetting;
 
-    // Inactive grids brightness
     const inactiveBrightnessSetting = createSetting({
         id: 'inactive-brightness',
         label: 'Grids Opacity',
@@ -2232,7 +2183,6 @@
     });
     settings.inactiveBrightness = inactiveBrightnessSetting;
 
-    // Base 9 toggle
     const base9Setting = createSetting({
         id: 'base9',
         label: 'Base 9 for 9x9',
@@ -2247,7 +2197,6 @@
     });
     settings.base9 = base9Setting;
 
-    // Sound enable toggle
     const soundEnableSetting = createSetting({
         id: 'sound-enable',
         label: 'Sound',
@@ -2262,8 +2211,6 @@
     });
     settings.soundEnable = soundEnableSetting;
 
-
-    // Sound volume
     const soundVolumeSetting = createSetting({
         id: 'sound-volume',
         label: 'Move sounds',
@@ -2282,7 +2229,6 @@
     });
     settings.soundVolume = soundVolumeSetting;
 
-    // Sound debounce
     const soundDebounceSetting = createSetting({
         id: 'sound-debounce',
         label: 'Sound frequency',
@@ -2300,7 +2246,6 @@
     });
     settings.soundDebounce = soundDebounceSetting;
 
-    // Minimize avgs
     const minimizeAvgsSetting = createSetting({
         id: 'minimize-avgs',
         label: 'Minimize timer / avgs',
@@ -2315,7 +2260,6 @@
     });
     settings.minimizeAvgs = minimizeAvgsSetting;
 
-    // Minimize sessions
     const minimizeSessionsSetting = createSetting({
         id: 'minimize-sessions',
         label: 'Minimize sessions list',
@@ -2330,7 +2274,6 @@
     });
     settings.minimizeSessions = minimizeSessionsSetting;
 
-    // Hide header during solves
     const hideHeaderDuringSolvesSetting = createSetting({
         id: 'hide-header-during-solves',
         label: 'Hide header during solves',
@@ -2341,7 +2284,6 @@
     });
     settings.hideHeaderDuringSolves = hideHeaderDuringSolvesSetting;
 
-    // Puzzle always in center
     const puzzleAlwaysInCenterSetting = createSetting({
         id: 'puzzle-always-in-center',
         label: 'Puzzle always in center',
@@ -2352,7 +2294,6 @@
     });
     settings.puzzleAlwaysInCenter = puzzleAlwaysInCenterSetting;
 
-    // Custom cursor enabled
     const cursorEnabledSetting = createSetting({
         id: 'cursor-enabled',
         label: 'Enable cursor',
@@ -2363,7 +2304,6 @@
     });
     settings.cursorEnabled = cursorEnabledSetting;
 
-    // Raw Hardware Input
     const rawHardwareInputSetting = createSetting({
         id: 'raw-hardware-input',
         label: 'Raw Hardware Input',
@@ -2380,7 +2320,6 @@
     });
     settings.rawHardwareInput = rawHardwareInputSetting;
 
-    // Stats: Graphs
     const statsGraphsSetting = createSetting({
         id: 'stats-graphs',
         label: 'Graphs (requires Stats module)',
@@ -2395,7 +2334,6 @@
     });
     settings.statsGraphs = statsGraphsSetting;
 
-    // Stats: Averages
     const statsAveragesSetting = createSetting({
         id: 'stats-averages',
         label: 'Main Stats module (averages, session stats)',
@@ -2410,7 +2348,6 @@
     });
     settings.statsAverages = statsAveragesSetting;
 
-    // Stats: Replays
     const statsReplaysSetting = createSetting({
         id: 'stats-replays',
         label: 'Integrated replays on click',
@@ -2435,7 +2372,6 @@
         if (ok) resetAllSettings();
     });
 
-    // helper to create a group (column)
     function createGroup(title, elements) {
         const group = document.createElement('div');
         group.className = 'slidy-setting-group';
@@ -2450,10 +2386,6 @@
 
         return group;
     }
-
-    // ------------------------------
-    // 1. CREATE GROUPS FIRST
-    // ------------------------------
 
     const bgGroup = createGroup('🖼️ Background settings', [
         uploadBtn,
@@ -2522,31 +2454,28 @@
 
     ]);
 
-    // ------------------------------
-    // 2. ASSEMBLE DROPDOWN
-    // ------------------------------
-
-    dropdownMenu.appendChild(bgGroup);
-    dropdownMenu.appendChild(cursorGroup);
-    dropdownMenu.appendChild(opacityGroup);
-    dropdownMenu.appendChild(hiddenPuzzlePosGroup);
-    dropdownMenu.appendChild(borderGroup);
-    dropdownMenu.appendChild(fontGroup);
-    dropdownMenu.appendChild(soundGroup);
-    dropdownMenu.appendChild(miscGroup);
-    dropdownMenu.appendChild(statsGroup);
-    dropdownMenu.appendChild(resetGroup);
+    dropdownMenu.append(
+        bgGroup,
+        cursorGroup,
+        opacityGroup,
+        hiddenPuzzlePosGroup,
+        borderGroup,
+        fontGroup,
+        soundGroup,
+        miscGroup,
+        statsGroup,
+        resetGroup
+    );
 
     controls.appendChild(dropdownBtn);
     controls.appendChild(dropdownMenu);
     soundEnableSetting.container.style.display = 'none';
-    // Toggle dropdown
+
     dropdownBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         dropdownMenu.style.display = dropdownMenu.style.display === 'grid' ? 'none' : 'grid';
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!controls.contains(e.target)) {
             dropdownMenu.style.display = 'none';
@@ -2605,13 +2534,11 @@
     }
 
     let startX, startY, startLeft, startTop;
-
-    let puzzleContainer = null;          // cached container
+    let puzzleContainer = null;
 
     function onDragStart(e) {
         e.preventDefault();
 
-        // Cache container once at the start of the drag
         if (!puzzleContainer) {
             puzzleContainer = document.querySelector('.puzzle-container');
         }
@@ -2629,8 +2556,7 @@
         document.addEventListener('touchend', onDragEnd);
     }
 
-
-    let pendingLeft = null, pendingTop = null;   // pending values for throttled update
+    let pendingLeft = null, pendingTop = null;
     let updateScheduled = false;
 
     function scheduleUpdate() {
@@ -2661,7 +2587,6 @@
         newLeft = Math.min(1900, Math.max(0, newLeft));
         newTop = Math.min(1000, Math.max(0, newTop));
 
-        // Store pending values and schedule one update per frame
         pendingLeft = newLeft;
         pendingTop = newTop;
         scheduleUpdate();
@@ -2674,15 +2599,12 @@
         document.removeEventListener('touchend', onDragEnd);
     }
 
-    // ==================== APPLICATION FUNCTIONS ====================
-
     function insertControls() {
         const header = document.querySelector('.header');
 
         const button = createSeeStatsButton();
         const filler = header.querySelector('.filler');
 
-        // Better LB button
         const betterLBButton = document.createElement('button');
         betterLBButton.textContent = 'Better LB';
         betterLBButton.style.whiteSpace = 'nowrap';
@@ -2727,11 +2649,7 @@
     function openLeaderboard() {
         const container = document.getElementById('main-content-container');
         if (!container) return;
-
-        // Clear existing content
         container.innerHTML = '';
-
-        // Create iframe
         const iframe = document.createElement('iframe');
         iframe.src = 'https://slidysim.github.io/lb';
         iframe.style.width = '100%';
@@ -2739,8 +2657,6 @@
         iframe.style.border = 'none';
         iframe.style.display = 'block';
         iframe.title = 'Slidysim Leaderboard';
-
-        // Append iframe to container
         container.appendChild(iframe);
     }
 
@@ -2765,23 +2681,19 @@
     fileInput.className = 'slidy-file-input';
     document.body.appendChild(fileInput);
 
-    // Cursor file input
     const cursorFileInput = document.createElement('input');
     cursorFileInput.type = 'file';
     cursorFileInput.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp,image/bmp,image/svg+xml,.cur,image/x-icon,image/vnd.microsoft.icon';
     cursorFileInput.className = 'slidy-cursor-file-input';
     document.body.appendChild(cursorFileInput);
 
-    // ==================== CURSOR FUNCTIONS ====================
-
     function applyCustomCursor(blobUrl) {
-        // Remove previous cursor styles if they exist
         const existingStyle = document.getElementById('custom-cursor-style');
         if (existingStyle) {
             existingStyle.remove();
         }
         if (!blobUrl) {
-            return; // Style already removed above, cursor returns to default
+            return;
         }
 
         const MAX_SIZE = 128;
@@ -2814,7 +2726,6 @@
             const hotspotX = Math.round(width / 2);
             const hotspotY = Math.round(height / 2);
 
-            // Create a new style element
             const style = document.createElement('style');
             style.id = 'custom-cursor-style';
             style.textContent = `
@@ -2838,12 +2749,10 @@
             document.body.classList.add('custom-cursor');
         } else {
             document.body.classList.remove('custom-cursor');
-            // Force remove the cursor style
             const existingStyle = document.getElementById('custom-cursor-style');
             if (existingStyle) {
                 existingStyle.remove();
             }
-            // Also reset the cursor on html element directly
             document.documentElement.style.cursor = 'auto';
         }
     }
@@ -2854,7 +2763,6 @@
             const dim = dimAmount !== undefined ? dimAmount : parseFloat(settings.bgDim.getValue());
             const blur = settings.bgBlur ? parseFloat(settings.bgBlur.getValue()) : currentConfig.bgBlur;
 
-            // Use pseudo-element for blur effect
             let blurStyleEl = document.getElementById('slidy-blur-bg-style');
             if (!blurStyleEl) {
                 blurStyleEl = document.createElement('style');
@@ -2862,7 +2770,6 @@
                 document.head.appendChild(blurStyleEl);
             }
 
-            // Combine multiple filters into a single filter property
             const filters = [];
             if (blur > 0) filters.push(`blur(${blur}px)`);
             filters.push(`brightness(${dim})`);
@@ -2899,7 +2806,6 @@
             mainContainer.style.backgroundAttachment = '';
             mainContainer.style.position = '';
         }
-        // Remove blur style element
         const blurStyleEl = document.getElementById('slidy-blur-bg-style');
         if (blurStyleEl) {
             blurStyleEl.remove();
@@ -2939,7 +2845,6 @@
     function addHorizontalScroll() {
         const container = document.querySelector('.focus-container');
         if (!container) return;
-        // Only add if we haven't already
         if (!container.dataset.wheelListener) {
             container.addEventListener('wheel', (e) => {
                 const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
@@ -2958,12 +2863,8 @@
     function overwriteInputs() {
         const element = document.querySelector('.focus-area');
         if (!element) return;
-
-        //console.log("overwriting inputs");
-
         const listener = __listenerStore.get(element);
         if (!listener) return;
-
         element.removeEventListener('mousemove', listener, false);
         element.addEventListener('pointerrawupdate', listener, false);
     }
@@ -2971,10 +2872,8 @@
     function restoreInputs() {
         const element = document.querySelector('.focus-area');
         if (!element) return;
-
         const listener = __listenerStore.get(element);
         if (!listener) return;
-
         element.removeEventListener('pointerrawupdate', listener, false);
         element.addEventListener('mousemove', listener, false);
     }
@@ -3038,8 +2937,6 @@
         root.style.setProperty('--puzzle-inactive-brightness', brightness);
     }
 
-    // ==================== BASE 9 FUNCTIONALITY ====================
-
     function toBase9(num) {
         if (num === 0) return '0';
         let result = '';
@@ -3070,8 +2967,6 @@
         });
     }
 
-    // ==================== SOUND FUNCTIONALITY ====================
-
     let soundAudio = null;
     let soundObserver = null;
 
@@ -3100,7 +2995,6 @@
             soundAudio.load();
         }
 
-        // Check if observer already attached to this puzzle
         if (puzzle._soundObserver) {
             return;
         }
@@ -3127,12 +3021,9 @@
             attributeFilter: ['style']
         });
 
-        // Store observer on the element for future checks
         puzzle._soundObserver = observer;
 
     }
-
-    // ==================== TEXT REPLACEMENT ====================
 
     function replaceText() {
         const container = document.querySelector('.stats-grid-container');
@@ -3196,21 +3087,18 @@
     }
 
     function minimizeSessions() {
-        // Page‑level guard (same as original)
         const guardSessionInfo = document.querySelector('.session-info');
         if (!guardSessionInfo) return;
         if (guardSessionInfo.getAttribute('data-slidy-sessions-minimized') === 'true') return;
         guardSessionInfo.setAttribute('data-slidy-sessions-minimized', 'true');
 
         const sessionBackgrounds = document.querySelectorAll('.session-background-inner');
-        const visibleSessions = []; // will hold sessionInfo elements for later centering
+        const visibleSessions = [];
         let maxDivCount = 0;
 
-        // ----- Single pass: filter, text‑replacement, empty removal, tooltip merge -----
         sessionBackgrounds.forEach(bg => {
             const sessionName = bg.querySelector('.session-name');
 
-            // Hide if session name matches blacklist
             if (sessionName && ['delete', 'remove', 'hide', 'hidden'].includes(
                 sessionName.textContent.trim().toLowerCase()
             )) {
@@ -3221,7 +3109,6 @@
             const sessionInfo = bg.querySelector('.session-info');
             if (!sessionInfo) return;
 
-            // --- Tooltip merge  ---
             const sessionContainer = bg.parentNode.parentNode.parentNode;
             const tooltipContainer = sessionContainer.querySelector('.session-info-tooltip');
             if (tooltipContainer) {
@@ -3230,19 +3117,18 @@
                     let text = tipDiv.textContent.trim();
                     text = text.replace(/Showing optimal length /g, '').replace(/[\(\)\[\]\{\}]/g, '');
                     const newDiv = document.createElement('div');
-                    newDiv.textContent = text || '\u00A0'; // preserve intentional empty rows
+                    newDiv.textContent = text || '\u00A0';
                     sessionInfo.appendChild(newDiv);
                 });
                 tooltipContainer.remove();
             }
 
-            // --- Text replacements on existing divs (originally pass 1) ---
             const divs = Array.from(sessionInfo.querySelectorAll('div'));
             divs.forEach(div => {
                 let text = div.textContent.trim();
                 // Apply all text modifications
                 if (text === 'Standard' || text === 'Mouse hover (Lines)') {
-                    div.remove(); // immediately remove instead of using \u00A0
+                    div.remove();
                     return;
                 }
                 if (text === 'Fewest moves') {
@@ -3261,7 +3147,6 @@
                 if (text.includes(' solves')) {
                     text = text.replace(/ solves/g, ' attempts');
                 }
-                // If after processing the text is empty, remove the div
                 if (text.trim() === '') {
                     div.remove();
                 } else {
@@ -3280,20 +3165,17 @@
                 });
             }
 
-            // --- Store for centering pass ---
             const finalDivCount = sessionInfo.querySelectorAll('div').length;
             if (finalDivCount > maxDivCount) maxDivCount = finalDivCount;
             visibleSessions.push(sessionInfo);
         });
 
-        // ----- Second pass: normalize div count and center data -----
         visibleSessions.forEach(sessionInfo => {
             const allDivs = Array.from(sessionInfo.querySelectorAll('div'));
             const currentCount = allDivs.length;
             const emptyNeeded = maxDivCount - currentCount;
 
             if (emptyNeeded > 0) {
-                // Add empty rows to reach maxCount, centering existing content
                 const emptyBefore = Math.floor(emptyNeeded / 2);
                 const emptyAfter = emptyNeeded - emptyBefore;
 
@@ -3308,7 +3190,6 @@
                     sessionInfo.appendChild(emptyDiv);
                 }
             } else if (currentCount === maxDivCount) {
-                // No extra rows needed, but existing data may still be off‑center
                 const nonEmptyDivs = allDivs.filter(div => {
                     const t = div.textContent.trim();
                     return t !== '' && t !== '\u00A0';
@@ -3324,7 +3205,6 @@
                     const divsToMove = emptyAbove - targetEmptyAbove;
 
                     if (divsToMove > 0) {
-                        // Move empty divs from top to bottom
                         for (let i = 0; i < divsToMove; i++) {
                             const first = sessionInfo.firstChild;
                             if (first && first.textContent.trim() === '') {
@@ -3334,7 +3214,6 @@
                             }
                         }
                     } else if (divsToMove < 0) {
-                        // Move empty divs from bottom to top
                         for (let i = 0; i < Math.abs(divsToMove); i++) {
                             const last = sessionInfo.lastChild;
                             if (last && last.textContent.trim() === '') {
@@ -3348,8 +3227,6 @@
             }
         });
     }
-
-    // ==================== EVENT HANDLERS ====================
 
     uploadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3378,7 +3255,6 @@
         }
     });
 
-    // Cursor upload/remove handlers
     cursorUploadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         cursorFileInput.click();
@@ -3394,7 +3270,6 @@
             }
             await deleteCursorFromDB();
             cursorRemoveBtn.style.display = 'none';
-            // Just turn off the visual cursor, don't change user's toggle preference
             toggleCustomCursor(false);
         } catch (error) {
             console.error('Failed to remove cursor:', error);
@@ -3411,21 +3286,16 @@
             await saveCursorToDB(file);
             currentCursorBlobUrl = URL.createObjectURL(file);
             cursorRemoveBtn.style.display = 'block';
-            // Auto-enable cursor when uploaded (only if not already enabled)
             if (!currentConfig.cursorEnabled) {
                 settings.cursorEnabled.setValue(true);
             }
             toggleCustomCursor(true);
-            // Reset input so same file can be uploaded again after removal
             cursorFileInput.value = '';
         } catch (error) {
             console.error('Failed to save cursor:', error);
             alert('Failed to save cursor. The file might be too large.');
         }
     });
-
-    // ==================== INITIALIZATION ====================
-
 
     async function init() {
         try {
@@ -3463,7 +3333,6 @@
             const isStatsTable = document.querySelector('.session-statistics-table');
             if (isStatsTable) {
 
-                // Focus the stats table or a focusable element first
                 const focusTarget = document.body;
                 focusTarget.focus();
 
@@ -3538,10 +3407,8 @@
         }
     }
 
-    // ==================== MAIN MUTATION OBSERVER ====================
-
     function preventMutationSpam(mutations) {
-        if (mutations.length > 3) return false; //it's not JUST a timer running, probably important stuff
+        if (mutations.length > 3) return false;
         for (const mutation of mutations) {
             const target = mutation.target.closest?.('tr');
             if (!target) continue;
@@ -3652,25 +3519,18 @@
         const moduleContainer = document.querySelector('.module-container');
 
         if (!show) {
-            // Only hide if standardStatsPanel exists
             if (standardStatsPanel) {
                 header.style.display = 'none';
                 if (mainContent) {
                     mainContent.style.top = '0';
                     mainContent.style.paddingTop = 'var(--header_height)';
-                    //  moduleContainer.style.marginTop = 'calc(-2 * var(--header_height))';
-                    // standardMainPanel.style.marginBottom = 'calc(-1 * var(--header_height))';
-                    //  standardStatsPanel.style.top = 'calc(var(--header_height) + 15px) !important';
                 }
             }
         } else {
-            // Showing
             header.style.display = 'flex';
             if (mainContent) {
                 mainContent.style.top = 'var(--header_height)';
-                //   standardMainPanel.style.marginBottom = '0';
                 mainContent.style.paddingTop = '0';
-                //  moduleContainer.style.marginTop = '0';
             }
             if (standardStatsPanel) {
                 standardStatsPanel.style.top = '0';
@@ -3893,7 +3753,6 @@
     });
 
     // ==================== STATS IMPROVEMENTS ====================
-    // Stub functions that will be replaced when stats module loads
     let _statsModule = null;
 
     function destroyCharts() {
@@ -3922,20 +3781,16 @@
         if (statsInitialized) return;
         statsInitialized = true;
 
-        // Check if stats features are enabled
         const graphsEnabled = settings.statsGraphs?.getValue() !== false;
         const avgsEnabled = settings.statsAverages?.getValue() !== false;
         const replaysEnabled = settings.statsReplays?.getValue() !== false;
 
         if (!graphsEnabled && !avgsEnabled && !replaysEnabled) {
-            //console.log('All stats features disabled');
             return;
         }
 
-        // Import stats functions from stats.user.js
         _statsModule = createStatsModule(graphsEnabled, avgsEnabled, replaysEnabled);
 
-        // Start the stats functionality
         if (_statsModule.startStats) {
             _statsModule.startStats();
         }
@@ -4147,7 +4002,7 @@
                 container.appendChild(loadingDiv);
 
                 iframe = document.createElement('iframe');
-                iframe.src = 'https://dphdmn.github.io/openslidy/replay';
+                iframe.src = 'https://slidysim.github.io/replay';
                 iframe.allow = 'clipboard-read; clipboard-write';
                 iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals';
 
@@ -4259,13 +4114,11 @@
                         if (tbody && tbody.children.length > 0) {
                             const detailRows = tbody.querySelectorAll('tr');
                             if (detailRows.length > 0) {
-                                // Always calculate splits, regardless of replays toggle
                                 if (detailRows.length > 1) {
                                     useDetailsForStats = true;
                                     extractedSolvesDetails.length = 0;
                                     if (avgsEnabled) calculateAvgs();
                                 }
-                                // Only load replay iframe if replays are enabled
                                 if (detailRows.length === 1 && replaysActive) {
                                     const firstRow = detailRows[0];
                                     const detailCells = firstRow.querySelectorAll('td');
@@ -4313,7 +4166,6 @@
         }
 
         function onDetailRowClick(detailRow) {
-            // Early return if replays are toggled off (prevent loading after toggle without reload)
             if (settings.statsReplays?.getValue() === false) {
                 return;
             }
@@ -4379,7 +4231,6 @@
                 setupEventListeners(calculatorContainer);
                 setTimeout(handleCalculateOrClick, 100);
 
-                // Set initial visibility based on setting
                 const graphsEnabled = settings.statsGraphs?.getValue() !== false;
                 if (!graphsEnabled) {
                     const graphsContainer = document.querySelector('#avgs-graphs-container');
@@ -5337,7 +5188,6 @@
             const resetBtn = document.querySelector('.avgs-reset-btn');
             updateFilterSummary();
             if (!useDetailsForStats) {
-                // updateSessionStats();
                 solves = filterSolves(allSolves);
                 if (resetBtn) resetBtn.style.display = 'none';
             } else {
@@ -6493,67 +6343,51 @@
             }
         }
 
-        // Toggle graphs visibility (show/hide without destroying)
         function toggleGraphs(show) {
             const graphsContainer = document.querySelector('#avgs-graphs-container');
             if (show) {
-                // Show: if container exists, make visible; if not, trigger stats initialization
                 if (graphsContainer) {
                     graphsContainer.style.display = '';
-                    // Remove no-graphs class to restore full height
                     calculatorContainer?.classList.remove('no-graphs');
                 }
-                // Trigger recalculate when turning graphs back on
                 setTimeout(() => calculateAvgs?.(), 50);
             } else {
-                // Hide: just hide if exists
                 if (graphsContainer) {
                     graphsContainer.style.display = 'none';
-                    // Add no-graphs class to reduce min-height
                     calculatorContainer?.classList.add('no-graphs');
                 }
             }
         }
 
-        // Toggle calculator visibility (show/hide without destroying)
         function toggleCalculator(show) {
             if (show) {
-                // Show: if container exists, make visible; if not, trigger stats initialization
                 if (calculatorContainer) {
                     calculatorContainer.style.display = '';
                 } else {
-                    // Force recalculate to create elements if needed
                     handleCalculateOrClick?.();
                 }
             } else {
-                // Hide: just hide if exists
                 if (calculatorContainer) {
                     calculatorContainer.style.display = 'none';
                 }
             }
         }
 
-        // Toggle replay overlay visibility
         function toggleOverlay(show) {
             if (show) {
-                // Show: enable listeners and show overlay if exists
                 const replaysActive = settings.statsReplays?.getValue() !== false;
                 if (overlay) {
                     overlay.style.display = '';
                 }
-                // Add listeners to existing rows
                 addSolveRowListeners();
             } else {
-                // Hide: just hide overlay if exists
                 if (overlay) {
                     overlay.style.display = 'none';
                 }
-                // Close overlay if open
                 document.querySelector('#closeReplayBtn')?.click();
             }
         }
 
-        // Function to start stats when module is initialized
         function startStats() {
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'q' || e.key === 'Q') {
@@ -6589,7 +6423,6 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    // Usage
     waitForElements(['.filler', '.header'], initStats);
 
 })();
