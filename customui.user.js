@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.26.1
+// @version      3.26.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3703,6 +3703,8 @@
         applyPuzzlePosition();
         if (!isEditingMode && !positionApplied && currentConfig.puzzleAlwaysInCenter) {
             toggleCenterPosition();
+        } else {
+            isCornerMode = true;
         }
         applyUIOpacity(currentConfig.uiOpacity);
 
