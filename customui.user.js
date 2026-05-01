@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.26.2
+// @version      3.27.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -32,7 +32,10 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
-
+        .module-container2 {
+            margin: 0 !important;
+            width: 100vw !important;
+        }
         .piece .text {
             font-family: var(--puzzle-font-family) !important;
             font-size: var(--puzzle-font-size) !important;
@@ -134,7 +137,7 @@
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
-            max-width: 250px;
+            max-width: 300px;
         }
         .left-hack td {
             font-size: 12px !important;
@@ -148,8 +151,7 @@
             top: 0 !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
-            font-size: 12px !important;
-            max-width: 250px;
+            max-width: 300px;
         }
         .center-hack td {
             font-size: 12px !important;
@@ -2449,9 +2451,9 @@
 
     const resetGroup = createGroup('♻️ Manage settings', [
         resetBtn,
-        createSectionLabel('Tip: Press End to reset or maximize puzzle size'),
+        createSectionLabel('Tip: Press End key to reset or maximize puzzle size'),
         createSectionLabel('Tip: Press Alt+Enter for Zen mode while solving'),
-
+        createSectionLabel('Tip: Right click to adjust puzzle position'),
     ]);
 
     dropdownMenu.append(
@@ -2644,6 +2646,21 @@
             header.appendChild(toggleCenterButton);
             header.appendChild(versionSpan);
         }
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 2) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                if (isEditingMode) {
+                    exitEditMode();
+                } else {
+                    enterEditMode();
+                }
+            }
+        });
     }
 
     function openLeaderboard() {
@@ -3577,6 +3594,7 @@
         if (z < 4) z = 4;
         const out = (z / 100).toFixed(2);
         el.style.setProperty('--zoom-factor', out);
+        //updatePuzzleWidthCSS();
     }
 
 
@@ -3592,6 +3610,7 @@
             } else {
                 setDefaultSize();
             }
+            //updatePuzzleWidthCSS();
         }
         if (e.altKey && e.key === 'Enter') {
             e.preventDefault();
@@ -3669,7 +3688,15 @@
             }
         }
     }
-
+    //very slow
+    function updatePuzzleWidthCSS() {
+        const puzzle = document.querySelector('.puzzle');
+        if (puzzle) {
+            const container = document.querySelector('.puzzle-container')
+            const zoomFactor = parseFloat(getComputedStyle(container).getPropertyValue('--zoom-factor'))
+            root.style.setProperty('--puzzle-width', `${puzzle.clientWidth * parseFloat(zoomFactor)}px`);
+        }
+    }
     const mainObserver = new MutationObserver((mutations) => {
         mainObserver.disconnect();
         if (preventMutationSpam(mutations)) return;
@@ -3697,14 +3724,14 @@
         } else {
             formatSingleSolve(false);
         }
-
+        //updatePuzzleWidthCSS();
         updateButtonVisibility();
         initSound();
         applyPuzzlePosition();
         if (!isEditingMode && !positionApplied && currentConfig.puzzleAlwaysInCenter) {
             toggleCenterPosition();
         } else {
-            isCornerMode = true;
+            //isCornerMode = true;
         }
         applyUIOpacity(currentConfig.uiOpacity);
 
