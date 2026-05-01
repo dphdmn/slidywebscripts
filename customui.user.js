@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.28.0
+// @version      3.29.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -2449,7 +2449,7 @@
         resetBtn,
         createSectionLabel('Tip: Press End key to reset or maximize puzzle size'),
         createSectionLabel('Tip: Press Alt+Enter for Zen mode while solving'),
-        createSectionLabel('Tip: Right click to adjust puzzle position'),
+        createSectionLabel('Tip: Press "A" key to adjust puzzle position'),
     ]);
 
     dropdownMenu.append(
@@ -2642,21 +2642,6 @@
             header.appendChild(toggleCenterButton);
             header.appendChild(versionSpan);
         }
-        document.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-        document.addEventListener('mousedown', (e) => {
-            if (e.button === 2) {
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                if (isEditingMode) {
-                    exitEditMode();
-                } else {
-                    enterEditMode();
-                }
-            }
-        });
     }
 
     function openLeaderboard() {
@@ -3629,6 +3614,9 @@
                 applyGridsBorder(currentConfig.gridsBorderWidth, currentConfig.gridsBorderColor);
                 applyInactiveBrightness(currentConfig.inactiveBrightness);
             }, 0);
+        }
+        if (e.key === 'a' || e.key === "A") {
+            toggleEditingMode(e);
         }
     });
 
