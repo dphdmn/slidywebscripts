@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.29.0
+// @version      3.30.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1188,6 +1188,10 @@
 
         let value = parseFloat(input.value);
         const unit = config.unit || '';
+        if (config.id === "sound-volume" && value < 0.02){
+            valueDisplay.textContent = 'Disabled';
+            return;
+        }
 
         if (unit === '%') {
             value = Math.round(value * 100);
@@ -2177,7 +2181,7 @@
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.inactiveBrightness,
         storageKey: STORAGE_KEYS.inactiveBrightness,
-        unit: '',
+        unit: '%',
         min: '0',
         max: '1',
         step: '0.01',
@@ -2219,7 +2223,7 @@
         type: 'slider',
         defaultValue: DEFAULT_CONFIG.soundVolume,
         storageKey: STORAGE_KEYS.soundVolume,
-        unit: '',
+        unit: '%',
         min: '0',
         max: '1',
         step: '0.01',
@@ -2449,7 +2453,7 @@
         resetBtn,
         createSectionLabel('Tip: Press End key to reset or maximize puzzle size'),
         createSectionLabel('Tip: Press Alt+Enter for Zen mode while solving'),
-        createSectionLabel('Tip: Press "A" key to adjust puzzle position'),
+        createSectionLabel('Tip: Press "A" or "C" to adjust puzzle position'),
     ]);
 
     dropdownMenu.append(
@@ -3617,6 +3621,9 @@
         }
         if (e.key === 'a' || e.key === "A") {
             toggleEditingMode(e);
+        }
+        if (e.key === 'c' || e.key === "C") {
+            toggleCenterPosition();
         }
     });
 
