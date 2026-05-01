@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.25.1
+// @version      3.26.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -22,6 +22,7 @@
     'use strict';
     const __listenerStore = new WeakMap();
     const originalAdd = EventTarget.prototype.addEventListener;
+    let root;
 
     EventTarget.prototype.addEventListener = function (type, listener, options) {
         if (this.matches?.('.focus-area') && type === 'mousemove') {
@@ -31,6 +32,96 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
+
+        .piece .text {
+            font-family: var(--puzzle-font-family) !important;
+            font-size: var(--puzzle-font-size) !important;
+            font-weight: var(--puzzle-font-bold) !important;
+        }
+        .piece {
+            border-radius: var(--puzzle-border-radius) !important;
+        }
+        .piece.inactive {
+            filter: brightness(var(--puzzle-inactive-brightness)) !important;
+        }        
+        .puzzle {
+            opacity: var(--puzzle-dim, 1);
+            background-color: color-mix(in srgb, var(--blank-color) calc(var(--blank-color-opacity, 1) * 100%), transparent);
+        }
+        .puzzle-container {
+            position: relative !important;
+            left: var(--puzzle-left, 0px) !important;
+            top: var(--puzzle-top, 0px) !important;
+        }
+        .piece .subscheme {
+            outline: var(--border-width-grids, 0) solid var(--border-color-grids, transparent);
+            outline-offset: calc(-1 * var(--border-width-grids, 0px));
+        }
+        .multi-select-button,
+        .ranking-table,
+        .standard-stats-panel,
+        .session-background,
+        .session-statistics-page-container,
+        .dialog,
+        .fewest-moves-stats-panel,
+        .fewest-moves-data-panel,
+        .fewest-moves-input,
+        .sessions-search-bar {
+            opacity: var(--ui-opacity, 1);
+        }
+
+        .session-background {
+            background-color: rgba(35, 35, 35, var(--ui-opacity, 1));
+        }
+
+        
+        input[type="checkbox"] {
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            width: 44px !important;
+            height: 24px !important;
+            border: 2px solid #374151 !important;
+            border-radius: 12px !important;
+            background-color: #111827 !important;
+            cursor: pointer !important;
+            position: relative !important;
+            transition: all 0.2s ease !important;
+            flex-shrink: 0 !important;
+            margin: 0 !important;
+        }
+
+        input[type="checkbox"]::after {
+            content: '' !important;
+            position: absolute !important;
+            left: 2px !important;
+            top: 2px !important;
+            width: 16px !important;
+            height: 16px !important;
+            border-radius: 50% !important;
+            background-color: #6b7280 !important;
+            transition: all 0.2s ease !important;
+        }
+
+        input[type="checkbox"]:hover {
+            border-color: #0891b2 !important;
+        }
+
+        input[type="checkbox"]:checked {
+            background-color: #0e7490 !important;
+            border-color: #0891b2 !important;
+        }
+
+        input[type="checkbox"]:checked::after {
+            left: 22px !important;
+            background-color: #fff !important;
+        }
+
+        .good {
+            background-color: rgba(34, 197, 94,0.66) !important;
+        }
+        .bad {
+            background-color: rgba(239, 68, 68,0.66) !important;
+        }
         .session-name {
             white-space: nowrap;
             overflow: hidden;
@@ -158,6 +249,7 @@
             align-items: center;
             padding: 6px 0;
             border-bottom: 1px solid #2a2a2a;
+            min-width: 360px;
         }
         .form-row:last-child {
             border-bottom: none;
@@ -1592,7 +1684,7 @@
         defaultValue: DEFAULT_CONFIG.uiOpacity,
         storageKey: STORAGE_KEYS.uiOpacity,
         unit: '%',
-        min: '0',
+        min: '0.1',
         max: '1',
         step: '0.01',
         onChange: (val) => applyUIOpacity(parseFloat(val))
@@ -2525,15 +2617,11 @@
         }
         if (!puzzleContainer) return;
 
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        startX = clientX;
-        startY = clientY;
+        startX = e.touches ? e.touches[0].clientX : e.clientX;
+        startY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        const currentLeft = parseFloat(puzzleContainer.style.left) || currentConfig.puzzleLeft;
-        const currentTop = parseFloat(puzzleContainer.style.top) || currentConfig.puzzleTop;
-        startLeft = currentLeft;
-        startTop = currentTop;
+        startLeft = currentConfig.puzzleLeft;
+        startTop = currentConfig.puzzleTop;
 
         document.addEventListener('mousemove', onDragMove);
         document.addEventListener('mouseup', onDragEnd);
@@ -2667,11 +2755,8 @@
 
         settings.puzzleLeft.setValue(0);
         settings.puzzleTop.setValue(0);
-
-        setTimeout(() => {
-            focusContainer.setAttribute('puzzle-position', 'center');
-            applyPuzzlePosition();
-        }, 0);
+        focusContainer.setAttribute('puzzle-position', 'center');
+        applyPuzzlePosition();
     }
 
     const fileInput = document.createElement('input');
@@ -2828,52 +2913,27 @@
     }
 
     function applyPuzzleDim(dimAmount) {
-        const puzzleElements = document.querySelectorAll('.puzzle');
-        puzzleElements.forEach(element => {
-            element.style.opacity = dimAmount;
-        });
+        if (dimAmount) {
+            root.style.setProperty('--puzzle-dim', dimAmount);
+        } else {
+            root.style.removeProperty('--puzzle-dim');
+        }
     }
 
     function applyBlankColor() {
-        const opacity = parseFloat(settings.blankColorOpacity.getValue());
-        const color = settings.blankColor.getValue();
+        const opacity = currentConfig.blankColorOpacity;
+        const color = currentConfig.blankColor;
 
-        // Parse the hex color to RGB
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-
-        const puzzleElements = document.querySelectorAll('.puzzle');
-        puzzleElements.forEach(element => {
-            element.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
-        });
+        root.style.setProperty('--blank-color', color);
+        root.style.setProperty('--blank-color-opacity', opacity);
     }
 
     function applyUIOpacity(opacity) {
-        const elements = document.querySelectorAll(
-            '.standard-stats-panel, .session-background, .session-statistics-page-container, .dialog, .fewest-moves-stats-panel, .fewest-moves-data-panel, .fewest-moves-input, .sessions-search-bar'
-        );
-        elements.forEach(element => {
-            element.style.opacity = opacity;
-            if (element.classList.contains('session-background')) {
-                element.style.backgroundColor = `rgba(35, 35, 35, ${opacity})`;
-            }
-        });
-
-        let style = document.querySelector('#ranking-hover-style');
-
-        if (!style) {
-            style = document.createElement('style');
-            style.id = 'ranking-hover-style';
-            document.head.appendChild(style);
+        if (opacity) {
+            root.style.setProperty('--ui-opacity', opacity);
+        } else {
+            root.style.removeProperty('--ui-opacity');
         }
-
-        style.textContent = `
-        .ranking-table tr:hover {
-            background-color: rgba(44, 44, 44, ${opacity});
-        }
-    `;
     }
 
     function addHorizontalScroll() {
@@ -2920,7 +2980,6 @@
     }
 
     function applyPuzzlePosition() {
-        const puzzleContainers = document.querySelectorAll('.puzzle-container');
         const focusContainer = document.querySelector('.focus-area');
         if (!focusContainer) {
             positionApplied = false;
@@ -2929,19 +2988,11 @@
         if (isCornerMode) {
             focusContainer.setAttribute('puzzle-position', 'corner');
         }
-        const leftVal = parseFloat(settings.puzzleLeft.getValue());
-        const topVal = parseFloat(settings.puzzleTop.getValue());
-
-        puzzleContainers.forEach(container => {
-            container.style.position = 'relative';
-            container.style.left = leftVal + 'px';
-            container.style.top = topVal + 'px';
-        });
+        root.style.setProperty('--puzzle-left', `${currentConfig.puzzleLeft}px`);
+        root.style.setProperty('--puzzle-top', `${currentConfig.puzzleTop}px`);
     }
 
     function applyBorder(width, color) {
-        const root = document.documentElement;
-
         if (width > 0) {
             root.style.setProperty('--border-width-puzzle', `${width}px`);
             root.style.setProperty('--border-color-puzzle', color);
@@ -2952,82 +3003,39 @@
     }
 
     function applyGridsBorder(width, color) {
-        const subschemes = document.querySelectorAll('.piece .subscheme');
-        if (subschemes.length === 0) return;
+        const subscheme = document.querySelector('.piece .subscheme');
+        if (!subscheme) return;
 
-        const bg = getComputedStyle(subschemes[0]).backgroundColor;
+        const bg = getComputedStyle(subscheme).backgroundColor;
         const hasBackground = bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
 
-        const boxShadow = (width > 0 && hasBackground)
-            ? `inset 0 0 0 ${width}px ${color}`
-            : '';
-
-        subschemes.forEach(subscheme => {
-            subscheme.style.boxShadow = boxShadow;
-        });
+        if (width > 0 && hasBackground) {
+            root.style.setProperty('--border-width-grids', `${width}px`);
+            root.style.setProperty('--border-color-grids', color);
+        } else {
+            root.style.removeProperty('--border-width-grids');
+            root.style.removeProperty('--border-color-grids');
+        }
     }
 
     function applyFontFamily(family) {
-        let fontFamily = family;
-        if (family === 'inherit') {
-            fontFamily = '';
-        }
-        const styleId = 'slidysim-font-family-style';
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-        if (fontFamily) {
-            styleEl.textContent = `.piece .text { font-family: "${fontFamily}", sans-serif !important; }`;
-        } else {
-            styleEl.textContent = '';
-        }
+        root.style.setProperty('--puzzle-font-family', `"${family}", sans-serif`);
     }
 
     function applyFontSize(size) {
-        const styleId = 'slidysim-font-size-style';
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-        styleEl.textContent = `.piece .text { font-size: ${size}px !important; }`;
+        root.style.setProperty('--puzzle-font-size', `${size}px`);
     }
 
     function applyBorderRadius(radius) {
-        const styleId = 'slidysim-border-radius-style';
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-        styleEl.textContent = `.piece { border-radius: ${radius}px !important; }`;
+        root.style.setProperty('--puzzle-border-radius', `${radius}px`);
     }
 
     function applyBold(isBold) {
-        const styleId = 'slidysim-font-bold-style';
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-        styleEl.textContent = `.piece .text { font-weight: ${isBold ? 'bold' : 'normal'} !important; }`;
+        root.style.setProperty('--puzzle-font-bold', isBold ? 'bold' : 'normal');
     }
 
     function applyInactiveBrightness(brightness) {
-        const styleId = 'slidysim-inactive-brightness-style';
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-        styleEl.textContent = `.piece.inactive { filter: brightness(${brightness}) !important; }`;
+        root.style.setProperty('--puzzle-inactive-brightness', brightness);
     }
 
     // ==================== BASE 9 FUNCTIONALITY ====================
@@ -3362,7 +3370,7 @@
             }
             await saveToDB(file);
             currentBlobUrl = URL.createObjectURL(file);
-            const currentDim = parseFloat(settings.bgDim.getValue());
+            const currentDim = currentConfig.bgDim;
             applyBackground(currentBlobUrl, currentDim);
         } catch (error) {
             console.error('Failed to save background:', error);
@@ -3404,7 +3412,7 @@
             currentCursorBlobUrl = URL.createObjectURL(file);
             cursorRemoveBtn.style.display = 'block';
             // Auto-enable cursor when uploaded (only if not already enabled)
-            if (!settings.cursorEnabled.getValue()) {
+            if (!currentConfig.cursorEnabled) {
                 settings.cursorEnabled.setValue(true);
             }
             toggleCustomCursor(true);
@@ -3735,12 +3743,8 @@
         }
         if (e.key === '1' || e.key === '2') {
             setTimeout(() => {
-                applyGridsBorder(
-                    parseInt(settings.gridsBorderWidth.getValue()),
-                    settings.gridsBorderColor.getValue()
-                );
-                applyInactiveBrightness(parseFloat(settings.inactiveBrightness.getValue()));
-
+                applyGridsBorder(currentConfig.gridsBorderWidth, currentConfig.gridsBorderColor);
+                applyInactiveBrightness(currentConfig.inactiveBrightness);
             }, 0);
         }
     });
@@ -3837,10 +3841,10 @@
         updateButtonVisibility();
         initSound();
         applyPuzzlePosition();
-        if (!isEditingMode && !positionApplied && settings.puzzleAlwaysInCenter && settings.puzzleAlwaysInCenter.getValue()) {
+        if (!isEditingMode && !positionApplied && currentConfig.puzzleAlwaysInCenter) {
             toggleCenterPosition();
         }
-        applyUIOpacity(parseFloat(settings.uiOpacity.getValue()));
+        applyUIOpacity(currentConfig.uiOpacity);
 
         if (currentConfig.minimizeAvgs || isZenMode) {
             replaceText();
@@ -3913,6 +3917,7 @@
     let statsInitialized = false;
 
     async function initStats() {
+        root = document.documentElement;
         await init();
         if (statsInitialized) return;
         statsInitialized = true;
