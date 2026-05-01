@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.27.1
+// @version      3.28.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1071,7 +1071,7 @@
         soundEnabled: true,
         soundVolume: 0.01,
         soundDebounce: 40,
-        minimizeAvgs: true,
+        hideTimerDuringSolves: false,
         minimizeSessions: true,
         hideHeaderDuringSolves: true,
         puzzleAlwaysInCenter: true,
@@ -1104,7 +1104,7 @@
         soundEnabled: 'slidysim_dph_script_sound_enabled',
         soundVolume: 'slidysim_dph_script_sound_volume',
         soundDebounce: 'slidysim_dph_script_sound_debounce',
-        minimizeAvgs: 'slidysim_dph_script_minimize_avgs',
+        hideTimerDuringSolves: 'slidysim_dph_script_hide_timer_during_solves',
         minimizeSessions: 'slidysim_dph_script_minimize_sessions',
         hideHeaderDuringSolves: 'slidysim_dph_script_hide_header_during_solves',
         puzzleAlwaysInCenter: 'slidysim_dph_script_puzzle_always_in_center',
@@ -2248,19 +2248,15 @@
     });
     settings.soundDebounce = soundDebounceSetting;
 
-    const minimizeAvgsSetting = createSetting({
+    const hideTimerDuringSolvesSetting = createSetting({
         id: 'minimize-avgs',
-        label: 'Minimize timer / avgs',
+        label: 'Hide timer during solves',
         type: 'checkbox',
-        defaultValue: DEFAULT_CONFIG.minimizeAvgs,
-        storageKey: STORAGE_KEYS.minimizeAvgs,
-        onChange: (val) => {
-            if (val) {
-                replaceText();
-            }
-        }
+        defaultValue: DEFAULT_CONFIG.hideTimerDuringSolves,
+        storageKey: STORAGE_KEYS.hideTimerDuringSolves,
+        onChange: (val) => { }
     });
-    settings.minimizeAvgs = minimizeAvgsSetting;
+    settings.hideTimerDuringSolves = hideTimerDuringSolvesSetting;
 
     const minimizeSessionsSetting = createSetting({
         id: 'minimize-sessions',
@@ -2437,10 +2433,10 @@
     ]);
 
     const miscGroup = createGroup('🧩 Layout settings', [
+        hideTimerDuringSolvesSetting.container,
+        hideHeaderDuringSolvesSetting.container,
         puzzleAlwaysInCenterSetting.container,
-        minimizeAvgsSetting.container,
         minimizeSessionsSetting.container,
-        hideHeaderDuringSolvesSetting.container
     ]);
 
     const statsGroup = createGroup('📊 Stats settings', [
@@ -3046,6 +3042,7 @@
         const container = document.querySelector('.stats-grid-container');
         const standardStatsPanel = document.querySelector('.standard-stats-panel');
         if (!container || !standardStatsPanel) return;
+        const hideTimer = currentConfig.hideTimerDuringSolves;
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (hideHeaderDuringSolves || isZenMode) {
@@ -3091,8 +3088,15 @@
                     // tds[2].style.color = 'white';
                     // tds[3].style.color = 'white';
                 }
+                if (hideTimer) {
+                    tds[1].style.display = 'none';
+                    tds[2].style.display = 'none';
+                    tds[3].style.display = 'none';
+                }
             } else {
-                container.querySelector('tr[avg="1"] td:first-child').style.display = '';
+                container.querySelectorAll('tr[avg="1"] td').forEach(td => {
+                    td.style.display = '';
+                });
                 if (avg === 'session' || avg === '1') return;
                 const shouldHide = [...row.querySelectorAll('td')].some(cell => {
                     const text = cell.textContent.trim();
@@ -3735,9 +3739,7 @@
         }
         applyUIOpacity(currentConfig.uiOpacity);
 
-        if (currentConfig.minimizeAvgs || isZenMode) {
-            replaceText();
-        }
+        replaceText();
 
         if (currentConfig.base9) {
             convertBase9();
