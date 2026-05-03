@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.35.0
+// @version      3.36.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -133,33 +133,25 @@
         .focus-area:focus-visible {
             outline: none !important;
         }
-        .left-hack {
+        .left-hack, .center-hack, .right-hack {
             position: fixed !important;
             top: 0 !important;
-            left: 0 !important;
             max-width: 300px;
         }
-        .left-hack td {
+        .left-hack td, .center-hack td, .right-hack td {
             font-size: 12px !important;
         }
-        .left-hack table {
+        .left-hack table, .center-hack table, .right-hack table {
             min-height: var(--header_height) !important;
             max-height: var(--header_height) !important;
         }
+
+        .left-hack { left: 0 !important; }
         .center-hack {
-            position: fixed !important;
-            top: 0 !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
-            max-width: 300px;
         }
-        .center-hack td {
-            font-size: 12px !important;
-        }
-        .center-hack table {
-            min-height: var(--header_height) !important;
-            max-height: var(--header_height) !important;
-        }
+        .right-hack { right: 0 !important; }
 
         /* Scrollbar styling */
         body,
@@ -3132,10 +3124,13 @@
         const hideTimer = currentConfig.hideTimerDuringSolves;
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
-        container.classList.remove('left-hack', 'center-hack');
+        container.classList.remove('center-hack', 'right-hack');
         if (hideHeaderDuringSolves || isZenMode) {
-            if (scrambled || isZenMode) {
-                container.classList.add(isCornerMode ? 'left-hack' : 'center-hack');
+            if (scrambled && !isZenMode){
+                container.classList.add('right-hack');
+            }
+            if (isZenMode && !isCornerMode) {
+                container.classList.add('center-hack');
             }
         }
         const thRow = container.querySelector('tr:has(th)');
@@ -3557,7 +3552,7 @@
 
         if (puzzleChanged) {
             const puzzleMatrix = parsePuzzleToNumberMatrix();
-            if (puzzleIsSolved(puzzleMatrix)){
+            if (puzzleIsSolved(puzzleMatrix)) {
                 return "probably reset spam";
             } else {
                 return "scrambled";
