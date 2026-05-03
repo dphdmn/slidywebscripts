@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.37.1
+// @version      3.38.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -32,6 +32,43 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
+        .session-statistics-table th {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 20px;
+            transition: background-color 0.2s;
+        }
+
+        .session-statistics-table th:hover {
+            background-color: rgba(0, 155, 121, 0.49);
+        }
+
+        /* Sort direction indicators based on table's data attributes */
+        .session-statistics-table[data-sort-direction-0="asc"] th:nth-child(1)::after,
+        .session-statistics-table[data-sort-direction-1="asc"] th:nth-child(2)::after,
+        .session-statistics-table[data-sort-direction-2="asc"] th:nth-child(3)::after,
+        .session-statistics-table[data-sort-direction-3="asc"] th:nth-child(4)::after,
+        .session-statistics-table[data-sort-direction-4="asc"] th:nth-child(5)::after {
+            content: '▲';
+            position: absolute;
+            right: 8px;
+            font-size: 12px;
+            color: #ffffff;
+        }
+
+        .session-statistics-table[data-sort-direction-0="desc"] th:nth-child(1)::after,
+        .session-statistics-table[data-sort-direction-1="desc"] th:nth-child(2)::after,
+        .session-statistics-table[data-sort-direction-2="desc"] th:nth-child(3)::after,
+        .session-statistics-table[data-sort-direction-3="desc"] th:nth-child(4)::after,
+        .session-statistics-table[data-sort-direction-4="desc"] th:nth-child(5)::after {
+            content: '▼';
+            position: absolute;
+            right: 8px;
+            font-size: 12px;
+            color: #ffffff;
+        }
+
         .module-container2 {
             margin: 0 !important;
             width: 100vw !important;
@@ -3126,7 +3163,7 @@
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         container.classList.remove('center-hack', 'right-hack');
         if (hideHeaderDuringSolves || isZenMode) {
-            if (scrambled && !isZenMode){
+            if (scrambled && !isZenMode) {
                 container.classList.add('right-hack');
             }
             if (isZenMode && !isCornerMode) {
@@ -3961,6 +3998,9 @@
             _statsModule.startStats();
         }
     }
+    const DNF_TIME = 999999.999;
+    const DNF_MOVES = 999999;
+    const DNF_TPS_BAD = -1e9;
 
     function createStatsModule(graphsEnabled, avgsEnabled, replaysEnabled) {
         // ==================== STATS VARIABLES ====================
@@ -3975,9 +4015,6 @@
         let extractedSolvesMain = [];
         let extractedSolvesDetails = [];
 
-        const DNF_TIME = 999999.999;
-        const DNF_MOVES = 999999;
-        const DNF_TPS_BAD = -1e9;
 
         // Calculator variables
         let calculatorContainer = null;
@@ -4407,7 +4444,8 @@
                 const tableContainer = document.querySelector('.session-statistics-table-container');
                 if (tableContainer && !tableContainer.hasAttribute('data-stats-observer')) {
                     tableContainer.setAttribute('data-stats-observer', 'true');
-                    const statsObserver = new MutationObserver(() => {
+                    const statsObserver = new MutationObserver((mutations) => {
+                        if (currentlySorting) return;
                         if (outputArea && !outputArea.value.includes('Calculating...')) {
                             if (tableUpdateTimeout) clearTimeout(tableUpdateTimeout);
                             extractedSolvesMain.length = 0;
@@ -4448,6 +4486,9 @@
 
         function observeTables() {
             const tables = document.querySelectorAll('.session-statistics-table');
+            const mainTable = tables[0];
+            makeTableSortable(mainTable);
+            //sortTable(mainTable, 0); //reverse id by default
 
             tables.forEach((table) => {
                 if (table.hasAttribute('data-observer-initialized')) return;
@@ -4924,7 +4965,8 @@
 
             if (useDetailsForStats) extractedSolvesDetails = solves;
             else extractedSolvesMain = solves;
-            return solves;
+            // sort solves based on solveId from lowest to highest
+            return solves.sort((a, b) => a.solveId - b.solveId);
         }
 
         function filterSolves(solves) {
@@ -5352,6 +5394,9 @@
             const resetBtn = document.querySelector('.avgs-reset-btn');
             updateFilterSummary();
             if (!useDetailsForStats) {
+                const table = document.querySelector('.session-statistics-table')
+                addSortingListeners(table);
+                sortTable(table, 0, 'desc'); //reverse id by default
                 solves = filterSolves(allSolves);
                 if (resetBtn) resetBtn.style.display = 'none';
             } else {
@@ -6622,6 +6667,144 @@
         }
 
         return true;
+    }
+
+    function parseTimeToSecondsSorting(timeStr) {
+        if (!timeStr) return 0;
+        if (timeStr === 'DNF') return DNF_TIME;
+
+        timeStr = timeStr.trim();
+
+        // Check if it contains colons (time format like 1:00.543 or 1:02.065)
+        if (timeStr.includes(':')) {
+            const parts = timeStr.split(':');
+
+            if (parts.length === 3) {
+                // Format: hours:minutes:seconds (e.g., 1:02:05.123)
+                const hours = parseInt(parts[0]) || 0;
+                const minutes = parseInt(parts[1]) || 0;
+                const seconds = parseFloat(parts[2]) || 0;
+                return hours * 3600 + minutes * 60 + seconds;
+            } else if (parts.length === 2) {
+                // Format: minutes:seconds (e.g., 1:00.543)
+                const minutes = parseInt(parts[0]) || 0;
+                const seconds = parseFloat(parts[1]) || 0;
+                return minutes * 60 + seconds;
+            }
+        }
+
+        const parsed = parseFloat(timeStr);
+        return isNaN(parsed) ? DNF_TIME : parsed;
+    }
+
+    let currentlySorting = false;
+    function sortTable(table, columnIndex, forceDirection = null) {
+        currentlySorting = true;
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const headers = table.querySelectorAll('th');
+
+        const headerText = headers[columnIndex].textContent.trim();
+        let newDirection;
+
+        if (forceDirection) {
+            newDirection = forceDirection;
+        } else {
+            const currentDirection = table.getAttribute(`data-sort-direction-${columnIndex}`);
+            if (!currentDirection) {
+                if (headerText === 'TPS' || headerText === 'Solve') {
+                    newDirection = 'desc';
+                } else {
+                    newDirection = 'asc';
+                }
+            } else {
+                newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+            }
+        }
+
+        for (let i = 0; i < headers.length; i++) {
+            table.removeAttribute(`data-sort-direction-${i}`);
+        }
+
+        table.setAttribute(`data-sort-direction-${columnIndex}`, newDirection);
+
+        rows.sort((a, b) => {
+            const cellA = a.querySelectorAll('td')[columnIndex];
+            const cellB = b.querySelectorAll('td')[columnIndex];
+
+            let valueA = cellA.textContent.trim();
+            let valueB = cellB.textContent.trim();
+
+            let compareResult;
+
+            if (headerText === 'Time') {
+                const timeA = parseTimeToSecondsSorting(valueA);
+                const timeB = parseTimeToSecondsSorting(valueB);
+                compareResult = timeA - timeB;
+            } else if (headerText === 'Solve' || headerText === 'Moves' || headerText === 'Optimals') {
+                valueA = parseInt(valueA) || DNF_MOVES;
+                valueB = parseInt(valueB) || DNF_MOVES;
+                compareResult = valueA - valueB;
+            } else if (headerText === 'TPS') {
+                const toNumber = (val) => {
+                    if (val === '∞') return Infinity;
+                    const num = parseFloat(val);
+                    return isNaN(num) ? DNF_TPS_BAD : num;
+                };
+                valueA = toNumber(valueA);
+                valueB = toNumber(valueB);
+                compareResult = valueA - valueB;
+            } else if (headerText === 'Timestamp') {
+                valueA = new Date(valueA);
+                valueB = new Date(valueB);
+                compareResult = valueA - valueB;
+            } else {
+                const numA = parseFloat(valueA);
+                const numB = parseFloat(valueB);
+                if (!isNaN(numA) && !isNaN(numB) && valueA !== '' && valueB !== '') {
+                    compareResult = numA - numB;
+                } else {
+                    compareResult = valueA.localeCompare(valueB);
+                }
+            }
+
+            return newDirection === 'asc' ? compareResult : -compareResult;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+        setTimeout(() => {
+            currentlySorting = false;
+        }, 0);
+    }
+
+    function addSortingListeners(table) {
+        if (!table) return;
+        const headers = table.querySelectorAll('th');
+        headers.forEach((header, index) => {
+            if (index === headers.length - 1) return; // Skip the last header
+            const newHeader = header.cloneNode(true);
+            header.parentNode.replaceChild(newHeader, header);
+            newHeader.addEventListener('click', () => sortTable(table, index));
+        });
+    }
+
+    function makeTableSortable(table) {
+        if (!table) return;
+
+        // Check if table already has sorting enabled
+        if (table.hasAttribute('data-sortable')) return;
+
+        // Mark table as sortable
+        table.setAttribute('data-sortable', 'true');
+
+        const headers = table.querySelectorAll('th');
+
+        headers.forEach((header, index) => {
+            if (index === headers.length - 1) return; // Skip the last header
+            header.style.cursor = 'pointer';
+            header.title = `Click to sort by ${header.textContent.trim()}`;
+        });
+        //addSortingListeners(table);
     }
 
 })();
