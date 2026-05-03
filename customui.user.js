@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.32.0
+// @version      3.33.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1030,6 +1030,21 @@
             grid-area: a !important;
             position: relative !important;
         }
+        .fewest-moves-main-panel {
+            grid-area: a !important;
+            position: relative !important;
+        }
+        .fewest-moves-data-panel {
+            padding: 2px;
+        }
+        .fewest-moves-stats-panel {
+            position: absolute !important;
+            right: 10px !important;
+            top: 10px !important;
+            max-width: 250px !important;
+            pointer-events: none;
+            user-select: none;
+        }            
         .module-container {
             background-color: transparent !important;
             background: none !important;
@@ -3029,8 +3044,11 @@
 
     function replaceText() {
         const container = document.querySelector('.stats-grid-container');
+        if (!container) return;
         const standardStatsPanel = document.querySelector('.standard-stats-panel');
-        if (!container || !standardStatsPanel) return;
+        const fmcStatsPanel = document.querySelector('.fewest-moves-stats-panel');
+        const isFMC = !!fmcStatsPanel;
+        if (!standardStatsPanel && !fmcStatsPanel) return;
         const hideTimer = currentConfig.hideTimerDuringSolves;
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
@@ -3064,7 +3082,7 @@
                 } else {
                     tds[0].style.display = '';
                 }
-                if (scrambled) {
+                if (scrambled && !isFMC) {
                     tds[1].textContent = '';
                     tds[2].textContent = 'Ready';
                     tds[3].textContent = '';
@@ -3529,11 +3547,12 @@
 
         const mainContent = document.querySelector('.main-content-container');
         const standardStatsPanel = document.querySelector('.standard-stats-panel');
+        const fmcStatsPanel = document.querySelector('.fewest-moves-stats-panel');
         const standardMainPanel = document.querySelector('.standard-main-panel');
         const moduleContainer = document.querySelector('.module-container');
 
         if (!show) {
-            if (standardStatsPanel) {
+            if (standardStatsPanel || fmcStatsPanel) {
                 header.style.display = 'none';
                 if (mainContent) {
                     mainContent.style.top = '0';
@@ -3548,6 +3567,9 @@
             }
             if (standardStatsPanel) {
                 standardStatsPanel.style.top = '0';
+            }
+            if (fmcStatsPanel) {
+                fmcStatsPanel.style.top = '0';
             }
         }
     }
