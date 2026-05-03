@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.37.0
+// @version      3.37.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1154,7 +1154,7 @@
         fontSize: 30,
         bold: false,
         inactiveBrightness: 0.3,
-        base9: true,
+        base9: false,
         soundEnabled: true,
         soundVolume: 0.01,
         soundDebounce: 40,
