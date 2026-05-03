@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.33.0
+// @version      3.34.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -389,7 +389,7 @@
             display: none;
             min-width: 30px;
             margin-left: 5px;
-            padding: 6px 16px;
+            padding: 6px 6px;
             background: rgba(60,60,60,0.9);
             color: white;
             border: 1px solid #666;
@@ -801,6 +801,10 @@
             margin-right: 8px;
             min-width: 60px;
         }
+        .date-filter-high {
+            position: relative;
+            bottom: 6px;
+        }
         .avgs-layout-main {
             display: flex;
             gap: 20px;
@@ -845,16 +849,14 @@
             border: 1px solid #555;
             color: #fff;
             padding: 4px 8px;
-            width: 80px;
+            min-width: 90px;
+            max-width: 90px;
             font-size: 13px;
         }
         .avgs-filter-input:focus,
         .avgs-date-input:focus {
             outline: none;
             border-color: #999;
-        }
-        .avgs-date-input {
-            width: 120px;
         }
         .avgs-date-row {
             display: flex;
@@ -868,6 +870,44 @@
             padding-top: 8px;
             border-top: 1px solid #555;
         }
+        #avgs-start-date,
+        #avgs-end-date {
+        background-color: #1e1e1e;
+        color: #ffffff;
+        border: 1px solid #444444;
+        color-scheme: dark;
+        }
+
+        #avgs-start-date::-webkit-calendar-picker-indicator,
+        #avgs-end-date::-webkit-calendar-picker-indicator {
+        filter: brightness(0) invert(1);
+        cursor: pointer;
+        }
+
+        #avgs-start-date::-webkit-datetime-edit,
+        #avgs-end-date::-webkit-datetime-edit {
+        color: #ffffff;
+        }
+
+        #avgs-start-date::-webkit-datetime-edit-fields-wrapper,
+        #avgs-end-date::-webkit-datetime-edit-fields-wrapper {
+        color: #ffffff;
+        }
+
+        #avgs-start-date::-webkit-datetime-edit-text,
+        #avgs-end-date::-webkit-datetime-edit-text {
+        color: #aaaaaa;
+        }
+
+        #avgs-start-date::-webkit-datetime-edit-month-field,
+        #avgs-start-date::-webkit-datetime-edit-day-field,
+        #avgs-start-date::-webkit-datetime-edit-year-field,
+        #avgs-end-date::-webkit-datetime-edit-month-field,
+        #avgs-end-date::-webkit-datetime-edit-day-field,
+        #avgs-end-date::-webkit-datetime-edit-year-field {
+        color: #ffffff;
+        }
+
         .avgs-progress-section {
             display: flex;
             align-items: center;
@@ -884,6 +924,46 @@
             font-size: 12px;
             min-width: 45px;
         }
+
+        .avgs-range-separator {
+            color: #999;
+            margin: 0 2px;
+        }
+
+        .avgs-date-range {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .avgs-quick-dates {
+            display: flex;
+            gap: 4px;
+        }
+
+        .avgs-quick-date-btn {
+            background: rgba(80, 80, 80, 0.6);
+            border: 1px solid #555;
+            color: #ccc;
+            padding: 8px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.1s;
+            border-radius: 0 !important;
+        }
+
+        .avgs-quick-date-btn:hover {
+            background: rgba(100, 100, 100, 0.8);
+            color: #fff;
+        }
+
+        .avgs-end-date-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .avgs-calc-btn,
         .avgs-reset-btn,
         .avgs-kill-btn {
@@ -5638,7 +5718,7 @@
                                 <div class="avgs-filter-row">
                                     <label class="avgs-checkbox-label">
                                         <input type="checkbox" id="avgs-use-date-range">
-                                        <span class="avgs-control-label">Date filter:</span>
+                                        <span class="avgs-control-label date-filter-high">Date filter:</span>
                                     </label>
                                     <div class="avgs-date-range" id="avgs-date-range-inputs" style="display:none;">
                                         <input type="date" id="avgs-start-date" class="avgs-date-input" value="${todayStr}">
@@ -5647,7 +5727,7 @@
                                             <input type="date" id="avgs-end-date" class="avgs-date-input" value="${todayStr}" style="display:none;">
                                             <label class="avgs-checkbox-label">
                                                 <input type="checkbox" id="avgs-no-end-date" checked>
-                                                <span>No end date</span>
+                                                <span class="avgs-control-label date-filter-high">Today</span>
                                             </label>
                                         </div>
                                     </div>
