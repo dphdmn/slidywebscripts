@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.31.0
+// @version      3.32.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3458,7 +3458,12 @@
         }
 
         if (puzzleChanged) {
-            return "scrambled";
+            const puzzleMatrix = parsePuzzleToNumberMatrix();
+            if (puzzleIsSolved(puzzleMatrix)){
+                return "probably reset spam";
+            } else {
+                return "scrambled";
+            }
         }
 
         return "unknown";
@@ -3696,7 +3701,7 @@
         exitFullscreen(document.documentElement);
         if (!scrambled || !currentConfig.hideHeaderDuringSolves) {
             toggleHeader(true);
-        } 
+        }
         isZenMode = false;
         replaceText();
     }
@@ -6485,5 +6490,43 @@
     }
 
     waitForElements(['.filler', '.header'], initStats);
+
+    function parsePuzzleToNumberMatrix() {
+        const puzzle = document.querySelector('.puzzle');
+        if (!puzzle) return null;
+
+        const pieces = Array.from(puzzle.querySelectorAll('.piece')).map(p => ({
+            left: parseInt(p.style.left) || 0,
+            top: parseInt(p.style.top) || 0,
+            value: parseInt(p.querySelector('.text')?.textContent?.trim()) || 0
+        }));
+
+        const leftValues = [...new Set(pieces.map(p => p.left))].sort((a, b) => a - b);
+        const topValues = [...new Set(pieces.map(p => p.top))].sort((a, b) => a - b);
+
+        const matrix = Array(topValues.length).fill().map(() => Array(leftValues.length).fill(0));
+
+        pieces.forEach(piece => {
+            const col = leftValues.indexOf(piece.left);
+            const row = topValues.indexOf(piece.top);
+            matrix[row][col] = piece.value;
+        });
+
+        return matrix;
+    }
+    function puzzleIsSolved(matrix) {
+        if (!matrix || matrix.length === 0) return false;
+
+        const flatNumbers = matrix.flat();
+        const nonZeroNumbers = flatNumbers.filter(num => num !== 0);
+
+        for (let i = 1; i < nonZeroNumbers.length; i++) {
+            if (nonZeroNumbers[i] <= nonZeroNumbers[i - 1]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
 })();
