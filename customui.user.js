@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.30.0
+// @version      3.31.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1188,7 +1188,7 @@
 
         let value = parseFloat(input.value);
         const unit = config.unit || '';
-        if (config.id === "sound-volume" && value < 0.02){
+        if (config.id === "sound-volume" && value < 0.02) {
             valueDisplay.textContent = 'Disabled';
             return;
         }
@@ -3034,9 +3034,8 @@
         const hideTimer = currentConfig.hideTimerDuringSolves;
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
+        container.classList.remove('left-hack', 'center-hack');
         if (hideHeaderDuringSolves || isZenMode) {
-            container.classList.remove('left-hack', 'center-hack');
-
             if (scrambled || isZenMode) {
                 container.classList.add(isCornerMode ? 'left-hack' : 'center-hack');
             }
@@ -3548,48 +3547,66 @@
         }
     }
 
+    const BASE = 75;
+
     function setMaxSize() {
         const focus = document.querySelector('.focus-container');
         const puzzle = document.querySelector('.puzzle-container');
         if (!focus || !puzzle) return;
+
         const focusH = focus.getBoundingClientRect().height;
         const puzzleH = puzzle.getBoundingClientRect().height;
-        let raw = parseFloat(getComputedStyle(puzzle).getPropertyValue('--zoom-factor'));
-        let z = Math.round((isNaN(raw) ? 1 : raw) * 100);
-        z = Math.round(z / 4) * 4;
-        const maxZ = Math.floor((focusH / puzzleH) * z);
-        const finalZ = Math.max(4, Math.floor(maxZ / 4) * 4);
-        const finalZoom = finalZ / 100;
-        puzzle.style.setProperty('--zoom-factor', finalZoom.toFixed(2));
-    }
 
+        let raw = parseFloat(getComputedStyle(puzzle).getPropertyValue('--zoom-factor'));
+        let z = Math.round((isNaN(raw) ? 1 : raw) * BASE);
+
+        const maxZ = Math.floor((focusH / puzzleH) * z);
+        const finalZ = Math.max(1, maxZ);
+
+        puzzle.style.setProperty('--zoom-factor', (finalZ / BASE));
+    }
     function setDefaultSize() {
         const el = document.querySelector('.puzzle-container');
         if (!el) return;
-        el.style.setProperty('--zoom-factor', '1.00');
+        el.style.setProperty('--zoom-factor', (1).toString());
     }
-
     function isZoomDefault() {
         const el = document.querySelector('.puzzle-container');
         if (!el) return false;
-        const raw = parseFloat(getComputedStyle(el).getPropertyValue('--zoom-factor'));
-        const z = Math.round((isNaN(raw) ? 0 : raw) * 100);
-        return z === 100;
-    }
 
+        const raw = parseFloat(getComputedStyle(el).getPropertyValue('--zoom-factor'));
+        const z = Math.round((isNaN(raw) ? 0 : raw) * BASE);
+
+        return z === BASE;
+    }
     function stepZoom(dir) {
         const el = document.querySelector('.puzzle-container');
         if (!el) return;
+
         const raw = parseFloat(getComputedStyle(el).getPropertyValue('--zoom-factor'));
-        let z = Math.round((isNaN(raw) ? 1 : raw) * 100);
-        z = Math.round(z / 4) * 4;
-        z += dir * 4;
-        if (z < 4) z = 4;
-        const out = (z / 100).toFixed(2);
-        el.style.setProperty('--zoom-factor', out);
-        //updatePuzzleWidthCSS();
+        let z = Math.round((isNaN(raw) ? 1 : raw) * BASE);
+
+        z += dir;
+        if (z < 1) z = 1;
+
+        el.style.setProperty('--zoom-factor', (z / BASE));
     }
 
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement &&
+            !document.webkitFullscreenElement &&
+            !document.msFullscreenElement) {
+            // Fullscreen was exited (possibly by Escape key)
+            exitZenMode();
+        }
+    });
+
+    // Also handle vendor-prefixed events for Safari/IE
+    document.addEventListener('webkitfullscreenchange', () => {
+        if (!document.webkitFullscreenElement) {
+            exitZenMode();
+        }
+    });
 
     window.addEventListener('keydown', e => {
         if (e.key === 'PageUp') setTimeout(() => stepZoom(+1), 0);
@@ -3617,7 +3634,7 @@
             setTimeout(() => {
                 applyGridsBorder(currentConfig.gridsBorderWidth, currentConfig.gridsBorderColor);
                 applyInactiveBrightness(currentConfig.inactiveBrightness);
-            }, 0);
+            }, 10);
         }
         if (e.key === 'a' || e.key === "A") {
             toggleEditingMode(e);
@@ -3628,6 +3645,16 @@
     });
 
     function enterFullscreen(element) {
+        // Guard: exit if no element provided
+        if (!element) return;
+
+        // Guard: exit if already in fullscreen (any element)
+        if (document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.msFullscreenElement) {
+            return;
+        }
+
         if (element.requestFullscreen) {
             element.requestFullscreen();
         } else if (element.webkitRequestFullscreen) { // Safari
@@ -3638,6 +3665,13 @@
     }
 
     function exitFullscreen() {
+        // Check if document is actually in fullscreen mode first
+        if (!document.fullscreenElement &&
+            !document.webkitFullscreenElement &&
+            !document.msFullscreenElement) {
+            return; // Not in fullscreen, nothing to exit
+        }
+
         if (document.exitFullscreen) {
             document.exitFullscreen();
         } else if (document.webkitExitFullscreen) { // Safari
@@ -3653,15 +3687,18 @@
         if (!mainContent) return;
         enterFullscreen(document.documentElement);
         toggleHeader(false);
-        replaceText();
         isZenMode = true;
+        replaceText();
+
     }
 
     function exitZenMode() {
         exitFullscreen(document.documentElement);
-        toggleHeader(true);
-        replaceText();
+        if (!scrambled || !currentConfig.hideHeaderDuringSolves) {
+            toggleHeader(true);
+        } 
         isZenMode = false;
+        replaceText();
     }
 
     function formatSingleSolve(finished) {
@@ -5174,7 +5211,6 @@
                         if (results.length > 0) {
 
                             const r = results[0];
-                            console.log(r.tpsAvg);
                             const comp1 = formatNumeric(r.movesAvg);
                             const comp2 = formatNumeric(r.tpsAvg);
                             const mainFormatted = formatTimeValue(r.mainAvg);
@@ -5190,7 +5226,6 @@
 
                 currentWorker.onerror = (e) => {
                     currentWorker = null;
-                    console.log(e);
                     reject(e);
                 };
 
