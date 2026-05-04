@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.41.5
+// @version      3.42.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -478,16 +478,20 @@
             border: 1px solid rgba(255,255,255,0.05);
             border-radius: 6px;
         }
+        .slidy-setting-group.cursor-settings-group {
+            max-height: 190px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
         .slidy-action-btn {
             background: rgba(255,255,255,0.1);
             border: 1px solid rgba(255,255,255,0.2);
             color: white;
-            padding: 6px 10px;
+            padding: 8px 10px;
             cursor: pointer;
             font-size: 12px;
             border-radius: 3px;
             width: 100%;
-            margin-bottom: 8px;
         }
         .slidy-action-btn.danger {
             background: rgba(255,255,255,0.08);
@@ -593,6 +597,91 @@
         .slidy-file-input,
         .slidy-cursor-file-input {
             display: none;
+        }
+        .cursor-preview-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: 1px solid #444;
+            border-radius: 6px;
+            background: #111;
+            margin-left: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .cursor-preview-badge-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        .cursor-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .cursor-preview-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            color: #eee;
+            text-align: left;
+            cursor: pointer;
+            position: relative;
+            min-height: 42px;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        .cursor-preview-item.selected {
+            border-color: #00bcd4;
+            box-shadow: 0 0 0 2px rgba(0, 188, 212, 0.16);
+        }
+        .cursor-preview-thumb {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            object-fit: contain;
+            background: #111;
+            border: 1px solid #222;
+        }
+        .cursor-preview-label {
+            flex: 1;
+            font-size: 11px;
+            color: #ccc;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .cursor-item-delete {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 22px;
+            height: 22px;
+            border: none;
+            background: rgba(255, 80, 80, 0.18);
+            color: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        .cursor-item-delete:hover {
+            background: rgba(255, 80, 80, 0.32);
+        }
+        .cursor-preview-empty {
+            color: #999;
+            font-size: 12px;
+            padding: 8px;
         }
         .slidy-drag-handle {
             position: absolute;
@@ -1335,6 +1424,7 @@
         statsAverages: 'slidysim_dph_script_stats_averages',
         statsReplays: 'slidysim_dph_script_stats_replays',
         cursorEnabled: 'slidysim_dph_script_cursor_enabled',
+        selectedCursorId: 'slidysim_dph_script_cursor_selected',
         rawHardwareInput: 'slidysim_dph_script_raw_hardware_input',
         borderRadius: 'slidysim_dph_script_border_radius'
     };
@@ -1607,7 +1697,7 @@
     }
 
     const DB_NAME = 'SlidySimBG';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
     const STORE_NAME = 'backgrounds';
     const BG_KEY = 'custom_bg';
     const CURSOR_DB_NAME = 'SlidySimCursor';
@@ -1617,6 +1707,8 @@
     let cursorDb = null;
     let currentBlobUrl = null;
     let currentCursorBlobUrl = null;
+    const cursorEntries = [];
+    let selectedCursorId = null;
 
     async function restoreMedia() {
         try {
@@ -1632,20 +1724,272 @@
             console.error('Failed to load background:', error);
         }
         try {
-            const cursorBlob = await loadCursorFromDB();
-            if (cursorBlob) {
-                if (currentCursorBlobUrl) {
-                    URL.revokeObjectURL(currentCursorBlobUrl);
-                }
-                currentCursorBlobUrl = URL.createObjectURL(cursorBlob);
-                cursorRemoveBtn.style.display = 'block';
-                if (currentConfig.cursorEnabled) {
-                    toggleCustomCursor(true);
+            const entries = await loadCursorEntriesFromDB();
+            cursorEntries.length = 0;
+            entries.forEach(entry => cursorEntries.push(entry));
+            cursorEntries.forEach(entry => {
+                createCursorObjectURL(entry);
+                ensureCursorMetadata(entry);
+            });
+
+            selectedCursorId = currentConfig.selectedCursorId && cursorEntries.some(entry => entry.id === currentConfig.selectedCursorId)
+                ? currentConfig.selectedCursorId
+                : (cursorEntries.length ? cursorEntries[0].id : null);
+
+            if (selectedCursorId) {
+                const selectedEntry = cursorEntries.find(entry => entry.id === selectedCursorId);
+                if (selectedEntry) {
+                    currentCursorBlobUrl = createCursorObjectURL(selectedEntry);
+                    if (currentConfig.cursorEnabled) {
+                        toggleCustomCursor(true);
+                    }
                 }
             }
+
+            renderCursorPicker();
         } catch (error) {
             console.error('Failed to load cursor:', error);
         }
+    }
+
+    async function loadCursorEntriesFromDB() {
+        return new Promise((resolve, reject) => {
+            const transaction = cursorDb.transaction([CURSOR_STORE_NAME], 'readonly');
+            const store = transaction.objectStore(CURSOR_STORE_NAME);
+            const request = store.openCursor();
+            const entries = [];
+
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (!cursor) {
+                    resolve(entries);
+                    return;
+                }
+
+                let value = cursor.value;
+                const key = cursor.key;
+
+                if (value instanceof Blob) {
+                    value = {
+                        id: key,
+                        blob: value,
+                        name: 'Custom cursor',
+                        createdAt: Date.now()
+                    };
+                } else if (value && typeof value === 'object') {
+                    value = {
+                        id: key,
+                        blob: value.blob || value,
+                        name: value.name || `Cursor ${key}`,
+                        createdAt: value.createdAt || Date.now()
+                    };
+                } else {
+                    cursor.continue();
+                    return;
+                }
+
+                entries.push(value);
+                cursor.continue();
+            };
+
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    async function saveCursorEntryToDB(blob, id, name) {
+        return new Promise((resolve, reject) => {
+            const transaction = cursorDb.transaction([CURSOR_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(CURSOR_STORE_NAME);
+            const cursorData = {
+                id,
+                blob,
+                name: name || `Cursor ${new Date().toLocaleString()}`,
+                createdAt: Date.now()
+            };
+            const request = store.put(cursorData, id);
+            request.onsuccess = () => resolve(cursorData);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    async function deleteCursorEntryFromDB(id) {
+        return new Promise((resolve, reject) => {
+            const transaction = cursorDb.transaction([CURSOR_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(CURSOR_STORE_NAME);
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    function createCursorObjectURL(entry) {
+        if (entry.url) return entry.url;
+        if (entry.blob) {
+            entry.url = URL.createObjectURL(entry.blob);
+        }
+        return entry.url;
+    }
+
+    function ensureCursorMetadata(entry) {
+        if (entry.hotspotX !== undefined && entry.hotspotY !== undefined) {
+            return Promise.resolve(entry);
+        }
+        if (entry.metadataPromise) {
+            return entry.metadataPromise;
+        }
+
+        entry.metadataPromise = new Promise((resolve) => {
+            const img = new Image();
+            img.onload = function () {
+                const width = img.naturalWidth || img.width || 32;
+                const height = img.naturalHeight || img.height || 32;
+                entry.hotspotX = Math.round(width / 2);
+                entry.hotspotY = Math.round(height / 2);
+                renderCursorPicker();
+                resolve(entry);
+            };
+            img.onerror = function () {
+                entry.hotspotX = 16;
+                entry.hotspotY = 16;
+                renderCursorPicker();
+                resolve(entry);
+            };
+            img.src = createCursorObjectURL(entry);
+        });
+
+        return entry.metadataPromise;
+    }
+
+    function revokeCursorObjectURL(entry) {
+        if (entry && entry.url) {
+            URL.revokeObjectURL(entry.url);
+            entry.url = null;
+        }
+    }
+
+    function getSelectedCursorEntry() {
+        return cursorEntries.find(entry => entry.id === selectedCursorId) || null;
+    }
+
+    function updateCursorControlsVisibility() {
+        const hasEntries = cursorEntries.length > 0;
+        cursorPreviewBadge.style.display = hasEntries ? 'inline-flex' : 'none';
+    }
+
+    function setSelectedCursorId(id, options = { store: true, notify: true }) {
+        selectedCursorId = id;
+        if (options.store) {
+            localStorage.setItem(STORAGE_KEYS.selectedCursorId, String(id));
+        }
+        renderCursorPicker();
+        if (options.notify && currentConfig.cursorEnabled) {
+            const selected = getSelectedCursorEntry();
+            if (selected) {
+                currentCursorBlobUrl = createCursorObjectURL(selected);
+                applyCustomCursor(currentCursorBlobUrl);
+            }
+        }
+    }
+
+    async function removeCursorEntry(id) {
+        const index = cursorEntries.findIndex(entry => entry.id === id);
+        if (index === -1) return;
+
+        const [entry] = cursorEntries.splice(index, 1);
+        revokeCursorObjectURL(entry);
+        await deleteCursorEntryFromDB(id);
+
+        if (selectedCursorId === id) {
+            selectedCursorId = cursorEntries.length ? cursorEntries[0].id : null;
+            if (selectedCursorId) {
+                localStorage.setItem(STORAGE_KEYS.selectedCursorId, selectedCursorId);
+                if (currentConfig.cursorEnabled) {
+                    const target = getSelectedCursorEntry();
+                    currentCursorBlobUrl = createCursorObjectURL(target);
+                    applyCustomCursor(currentCursorBlobUrl);
+                }
+            } else {
+                localStorage.removeItem(STORAGE_KEYS.selectedCursorId);
+                toggleCustomCursor(false);
+            }
+        }
+
+        renderCursorPicker();
+    }
+
+    function renderCursorPicker() {
+        cursorListContainer.innerHTML = '';
+        const selected = getSelectedCursorEntry();
+        updateCursorControlsVisibility();
+
+        if (!cursorEntries.length) {
+            const empty = document.createElement('div');
+            empty.className = 'cursor-preview-empty';
+            empty.textContent = 'No cursors uploaded yet';
+            cursorListContainer.appendChild(empty);
+            cursorPreviewImg.src = '';
+            cursorPreviewImg.alt = 'No cursor';
+            cursorPreviewBadge.style.cursor = 'auto';
+            return;
+        }
+
+        cursorPreviewImg.src = selected ? createCursorObjectURL(selected) : '';
+        cursorPreviewImg.alt = selected ? selected.name : 'Cursor preview';
+        if (selected) {
+            const selectedHotspotX = selected.hotspotX ?? 16;
+            const selectedHotspotY = selected.hotspotY ?? 16;
+            cursorPreviewBadge.style.cursor = `url('${createCursorObjectURL(selected)}') ${selectedHotspotX} ${selectedHotspotY}, auto`;
+        } else {
+            cursorPreviewBadge.style.cursor = 'auto';
+        }
+
+        cursorEntries.forEach(entry => {
+            const hotspotX = entry.hotspotX ?? 16;
+            const hotspotY = entry.hotspotY ?? 16;
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'cursor-preview-item';
+            if (entry.id === selectedCursorId) {
+                item.classList.add('selected');
+            }
+
+            const img = document.createElement('img');
+            img.className = 'cursor-preview-thumb';
+            img.src = createCursorObjectURL(entry);
+            img.alt = entry.name;
+            item.appendChild(img);
+
+            const label = document.createElement('span');
+            label.className = 'cursor-preview-label';
+            label.textContent = entry.name;
+            item.appendChild(label);
+
+            item.style.cursor = `url('${createCursorObjectURL(entry)}') ${hotspotX} ${hotspotY}, auto`;
+            item.title = `Select "${entry.name}"`;
+
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setSelectedCursorId(entry.id);
+                if (currentConfig.cursorEnabled) {
+                    currentCursorBlobUrl = createCursorObjectURL(entry);
+                    applyCustomCursor(currentCursorBlobUrl);
+                }
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'cursor-item-delete';
+            deleteBtn.textContent = '✕';
+            deleteBtn.title = `Delete "${entry.name}"`;
+            deleteBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await removeCursorEntry(entry.id);
+            });
+            item.appendChild(deleteBtn);
+
+            cursorListContainer.appendChild(item);
+        });
     }
 
     async function restoreSettings() {
@@ -1715,7 +2059,7 @@
 
     function openCursorDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(CURSOR_DB_NAME, 1);
+            const request = indexedDB.open(CURSOR_DB_NAME, 2);
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains(CURSOR_STORE_NAME)) {
@@ -1783,11 +2127,19 @@
     const cursorUploadBtn = document.createElement('button');
     cursorUploadBtn.textContent = '📁 Upload Cursor';
     cursorUploadBtn.className = 'slidy-action-btn';
+    cursorUploadBtn.style.maxWidth = '120px';
 
-    const cursorRemoveBtn = document.createElement('button');
-    cursorRemoveBtn.textContent = '🗑️ Remove Cursor';
-    cursorRemoveBtn.className = 'slidy-action-btn';
-    cursorRemoveBtn.style.display = 'none';
+    const cursorPreviewBadge = document.createElement('div');
+    cursorPreviewBadge.className = 'cursor-preview-badge';
+    cursorPreviewBadge.title = 'Selected cursor preview';
+    cursorPreviewBadge.style.display = 'none';
+    const cursorPreviewImg = document.createElement('img');
+    cursorPreviewImg.className = 'cursor-preview-badge-img';
+    cursorPreviewImg.alt = 'Selected cursor';
+    cursorPreviewBadge.appendChild(cursorPreviewImg);
+
+    const cursorListContainer = document.createElement('div');
+    cursorListContainer.className = 'cursor-list';
 
     function createSectionLabel(text, marginTop = '6px') {
         const label = document.createElement('div');
@@ -2521,11 +2873,16 @@
         id: 'cursor-enabled',
         label: 'Enable cursor',
         type: 'checkbox',
-        defaultValue: false,
+        defaultValue: DEFAULT_CONFIG.cursorEnabled,
         storageKey: STORAGE_KEYS.cursorEnabled,
         onChange: (val) => toggleCustomCursor(val)
     });
     settings.cursorEnabled = cursorEnabledSetting;
+    cursorEnabledSetting.container.prepend(cursorUploadBtn);
+    cursorEnabledSetting.container.prepend(cursorPreviewBadge);
+    cursorPreviewBadge.style.marginLeft = 'auto';
+    cursorPreviewBadge.style.marginRight = '0';
+    cursorPreviewBadge.style.display = 'inline-flex';
 
     const rawHardwareInputSetting = createSetting({
         id: 'raw-hardware-input',
@@ -2618,10 +2975,10 @@
     ]);
 
     const cursorGroup = createGroup('🖱️ Cursor settings', [
-        cursorUploadBtn,
-        cursorRemoveBtn,
         cursorEnabledSetting.container,
+        cursorListContainer
     ]);
+    cursorGroup.classList.add('cursor-settings-group');
 
     const opacityGroup = createGroup('🪟 Opacity settings', [
         uiOpacitySetting.container,
@@ -2902,13 +3259,11 @@
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
     fileInput.className = 'slidy-file-input';
-    document.body.appendChild(fileInput);
 
     const cursorFileInput = document.createElement('input');
     cursorFileInput.type = 'file';
     cursorFileInput.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp,image/bmp,image/svg+xml,.cur,image/x-icon,image/vnd.microsoft.icon';
     cursorFileInput.className = 'slidy-cursor-file-input';
-    document.body.appendChild(cursorFileInput);
 
     function applyCustomCursor(blobUrl) {
         const existingStyle = document.getElementById('custom-cursor-style');
@@ -3496,38 +3851,25 @@
     cursorUploadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         cursorFileInput.click();
-
-    });
-
-    cursorRemoveBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        try {
-            if (currentCursorBlobUrl) {
-                URL.revokeObjectURL(currentCursorBlobUrl);
-                currentCursorBlobUrl = null;
-            }
-            await deleteCursorFromDB();
-            cursorRemoveBtn.style.display = 'none';
-            toggleCustomCursor(false);
-        } catch (error) {
-            console.error('Failed to remove cursor:', error);
-        }
     });
 
     cursorFileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         try {
-            if (currentCursorBlobUrl) {
-                URL.revokeObjectURL(currentCursorBlobUrl);
-            }
-            await saveCursorToDB(file);
-            currentCursorBlobUrl = URL.createObjectURL(file);
-            cursorRemoveBtn.style.display = 'block';
+            const id = `cursor_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+            const entry = await saveCursorEntryToDB(file, id, file.name || 'Custom cursor');
+            createCursorObjectURL(entry);
+            ensureCursorMetadata(entry);
+            cursorEntries.push(entry);
+            setSelectedCursorId(entry.id);
             if (!currentConfig.cursorEnabled) {
                 settings.cursorEnabled.setValue(true);
             }
-            toggleCustomCursor(true);
+            if (currentConfig.cursorEnabled) {
+                currentCursorBlobUrl = entry.url;
+                applyCustomCursor(currentCursorBlobUrl);
+            }
             cursorFileInput.value = '';
         } catch (error) {
             console.error('Failed to save cursor:', error);
