@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.39.0
+// @version      3.40.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -32,6 +32,78 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
+        body {
+            height: 100%;
+        }
+        .standard-main-panel {
+            grid-area: a !important;
+            position: relative !important;
+            display: flex !important;          
+            flex-direction: row !important;    
+            height: 100%;                      
+            overflow: hidden;                  
+        }
+            /* Wrapper for all original content – takes remaining space */
+        .main-content {
+            flex: 1 1 0%;          
+            min-width: 100px;      
+            overflow: auto;       
+        }
+        /* The live stats container – now a flex child */
+        .live-stats-container {
+            position: relative;     
+            height: auto;            
+            flex-shrink: 0;          
+            width: 310px;            
+            min-width: 10px;
+            background: #1a1a1a;
+            color: #ddd;
+            font-family: monospace;
+            font-size: 13px;
+            overflow: hidden;
+            box-sizing: border-box;
+            border-left: 2px solid #444;
+            z-index: 9999;          
+        }
+
+        .live-resize-handle {
+            position: absolute;
+            left: -6px;
+            top: 0; bottom: 0;
+            width: 12px;
+            cursor: col-resize;
+            z-index: 10;
+            background: transparent;
+        }
+        .live-resize-handle:hover,
+        .live-resize-handle:active {
+            background: rgba(255,255,255,0.05);
+        }
+        .live-table {
+            width: auto;
+            border-collapse: collapse;
+        }
+        .live-table th, .live-table td {
+            padding: 4px 6px;
+            border-right: 1px solid #333;
+            border-bottom: 1px solid #2a2a2a;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-sizing: border-box;
+        }
+        .live-table thead th {
+            background: #2a2a2a;
+            color: #aaa;
+            font-weight: normal;
+            font-size: 11px;
+            border-bottom: 2px solid #444;
+        }
+        .live-table tbody tr:hover td {
+            background: #252525;
+        }        
+
+
         .session-statistics-table th {
             cursor: pointer;
             user-select: none;
@@ -72,6 +144,7 @@
         .module-container2 {
             margin: 0 !important;
             width: 100vw !important;
+            height: var(--content_height) !important;
         }
         .piece .text {
             font-family: var(--puzzle-font-family) !important;
@@ -106,7 +179,8 @@
         .fewest-moves-stats-panel,
         .fewest-moves-data-panel,
         .fewest-moves-input,
-        .sessions-search-bar {
+        .sessions-search-bar,
+        .live-stats-container {
             opacity: var(--ui-opacity, 1);
         }
 
@@ -195,6 +269,7 @@
         .focus-container {
             scrollbar-width: auto !important;
             scrollbar-color: #8a92b8 #0f1115 !important;
+            height: 100%;
         }
         body::-webkit-scrollbar,
         .focus-container::-webkit-scrollbar {
@@ -1126,18 +1201,14 @@
         }
         .standard-stats-panel {
             position: absolute !important;
-            right: 10px !important;
-            top: 10px !important;
+            right: 300px !important;
+            top: 0 !important;
             max-width: 250px !important;
             pointer-events: none;
             user-select: none;
         }
         .header {
             z-index: 100 !important;
-        }
-        .standard-main-panel {
-            grid-area: a !important;
-            position: relative !important;
         }
         .fewest-moves-main-panel {
             grid-area: a !important;
@@ -3884,6 +3955,9 @@
         //console.log(state);
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (state === "scrambled") {
+            if (!(solveFromSameSession(getSolveFromTable()))) {
+                liveSolvesData.length = 0;
+            }
             formatSingleSolve(false);
             unlockKeys();
             scrambled = true;
@@ -3894,6 +3968,9 @@
                 exitEditMode();
             }
         } else if (state === "finished") {
+            trackSolve(getSolveFromTable());
+            liveStats.update();
+            console.log(liveSolvesData);
             scrambled = false;
             if (hideHeaderDuringSolves && !isZenMode) {
                 toggleHeader(true);
@@ -3901,6 +3978,7 @@
             formatSingleSolve(true);
         } else {
             formatSingleSolve(false);
+            initLiveContainer();
         }
         //updatePuzzleWidthCSS();
         updateButtonVisibility();
@@ -6820,6 +6898,227 @@
 
         sessionsHeader.insertBefore(button, sessionsHeader.firstChild);
         sessionsHeader.appendChild(paddedDiv);
+    }
+
+    const liveSolvesData = [];
+
+    function getSolveFromTable() {
+        const container = document.querySelector('.stats-grid-container');
+        if (!container) return null;
+
+        const rows = container.querySelectorAll('tr');
+        const rowKeys = [1, 5, 12, 25, 50, 100];
+        const solve = { timestamp: Date.now() };
+
+        let keyIndex = 0;
+        let lastHeader = null;
+
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+
+            lastHeader = cells[0].textContent.trim();
+
+            if (keyIndex >= rowKeys.length) return;
+
+            const rowData = [];
+            for (let i = 1; i < cells.length; i++) {
+                rowData.push(cells[i].textContent.trim() || 'DNF');
+            }
+
+            solve[rowKeys[keyIndex]] = rowData;
+            keyIndex++;
+        });
+
+        if (lastHeader) {
+            solve.solveCounter = parseInt(lastHeader.replace(/\D/g, '')) || null;
+        }
+
+        const sessionName = document.querySelector('.session-name');
+        if (sessionName) {
+            solve.session = sessionName.textContent.trim();
+        }
+
+        return solve;
+    }
+
+    function solveFromSameSession(solve) {
+        if (!liveSolvesData.length) return false;
+        const last = liveSolvesData[liveSolvesData.length - 1];
+        if (solve.session !== last.session) return false;
+        for (const k of [1, 5, 12, 25, 50, 100]) {
+            const a = solve[k], b = last[k];
+            for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+        }
+        return solve.solveCounter === last.solveCounter;
+    }
+
+    function createLiveStatsContainer(parent = document.body) {
+        const container = document.createElement('div');
+        container.className = 'live-stats-container';
+        container.id = 'liveStatsContainer';
+
+        const handle = document.createElement('div');
+        handle.className = 'live-resize-handle';
+
+        const tableWrapper = document.createElement('div');
+        tableWrapper.style.overflow = 'hidden';
+        tableWrapper.style.height = '100%';
+
+        const table = document.createElement('table');
+        table.className = 'live-table';
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
+        tbody.id = 'liveTableBody';
+        const colgroup = document.createElement('colgroup');
+        const ONECELL = 60;
+        const CELLNUMBER = 20;
+        const rowKeys = [1, 5, 12, 25, 50, 100];
+        const timeColWidth = ONECELL;
+        const statColWidth = ONECELL;
+
+        const colTime = document.createElement('col');
+        colTime.style.width = timeColWidth + 'px';
+        colgroup.appendChild(colTime);
+
+        rowKeys.forEach(() => {
+            for (let s = 0; s < 3; s++) {
+                const col = document.createElement('col');
+                col.style.width = statColWidth + 'px';
+                colgroup.appendChild(col);
+            }
+        });
+
+        table.appendChild(colgroup);
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        tableWrapper.appendChild(table);
+        container.appendChild(handle);
+        container.appendChild(tableWrapper);
+
+        function buildHeader() {
+            let headerRow = document.createElement('tr');
+            const thTime = document.createElement('th');
+            thTime.textContent = 'HH:MM';
+            const thNum = document.createElement('th');
+            thNum.textContent = '#';
+            headerRow.appendChild(thTime);
+            headerRow.appendChild(thNum);
+            rowKeys.forEach(k => {
+                ['Time', 'Moves', 'TPS'].forEach(label => {
+                    const th = document.createElement('th');
+                    if (k === 1){
+                        th.textContent = `${label}`;
+                    } else {
+                        th.textContent = `ao${k}`;
+                    }
+                    headerRow.appendChild(th);
+                });
+            });
+            thead.innerHTML = '';
+            thead.appendChild(headerRow);
+        }
+        buildHeader();
+
+        const totalTableWidth = ONECELL * CELLNUMBER;
+        table.style.width = totalTableWidth + 'px';
+        container.style.width = (5 * ONECELL) + 'px';
+
+        let startX, startWidth;
+        handle.addEventListener('mousedown', e => {
+            e.preventDefault();
+            startX = e.clientX;
+            startWidth = container.offsetWidth;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        function onMouseMove(e) {
+            const dx = startX - e.clientX;
+            let newWidth = startWidth + dx;
+            newWidth = Math.max(10, Math.min(ONECELL*CELLNUMBER, newWidth));
+            container.style.width = newWidth + 'px';
+            container.style.setProperty('width', newWidth + 'px', 'important');
+            
+            const statsPanel = document.querySelector(".standard-stats-panel");
+            if (statsPanel) {
+                statsPanel.style.right = (newWidth) + 'px';
+                statsPanel.style.setProperty('right', (newWidth) + 'px', 'important');
+            }
+        }
+
+        function onMouseUp() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        parent.appendChild(container);
+
+        return {
+            container,
+            tbody,
+            update: () => updateLiveStatsTable(tbody, rowKeys, timeColWidth, statColWidth)
+        };
+    }
+
+    function updateLiveStatsTable(tbody, rowKeys) {
+        while (tbody.firstChild) {
+            tbody.removeChild(tbody.firstChild);
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        for (let i = liveSolvesData.length - 1; i >= 0; i--) {
+            const solve = liveSolvesData[i];
+            const d = new Date(solve.timestamp);
+            const timeStr = d.getHours().toString().padStart(2, '0') + ':' +
+                            d.getMinutes().toString().padStart(2, '0');
+            const tr = document.createElement('tr');
+
+            const tdTime = document.createElement('td');
+            tdTime.textContent = timeStr;
+            tr.appendChild(tdTime);
+
+            const tdNum = document.createElement('td');
+            tdNum.textContent = solve.solveCounter;
+            tr.appendChild(tdNum);
+
+            rowKeys.forEach(k => {
+                const arr = solve[k] || [];
+                for (let j = 0; j < 3; j++) {
+                    const td = document.createElement('td');
+                    td.textContent = arr[j].replace('DNF','—') || '—';
+                    tr.appendChild(td);
+                }
+            });
+
+            fragment.appendChild(tr);
+        }
+
+        tbody.appendChild(fragment);
+    }
+
+    let liveStats;
+    function initLiveContainer() {
+        const parent = document.querySelector(".standard-main-panel");
+        if (!parent) return;
+        if (parent.querySelector(".live-stats-container")) {
+            return;
+        }
+
+        if (!parent.querySelector(".main-content")) {
+            const wrapper = document.createElement("div");
+            wrapper.className = "main-content";
+            while (parent.firstChild) {
+                wrapper.appendChild(parent.firstChild);
+            }
+            parent.appendChild(wrapper);
+        }
+
+        liveStats = createLiveStatsContainer(parent);
+    }
+
+    function trackSolve(solve){
+        liveSolvesData.push(solve);
     }
 
 })();
