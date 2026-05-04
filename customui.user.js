@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.40.0
+// @version      3.40.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3957,6 +3957,7 @@
         if (state === "scrambled") {
             if (!(solveFromSameSession(getSolveFromTable()))) {
                 liveSolvesData.length = 0;
+                liveStats.update();
             }
             formatSingleSolve(false);
             unlockKeys();
