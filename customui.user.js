@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.41.4
+// @version      3.41.5
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -7074,6 +7074,8 @@
     function clearLiveTable() {
         if (liveStats?.tbody) {
             liveStats.tbody.textContent = '';
+            const headerEl = document.getElementById('solveCountHeader');
+            if (headerEl) headerEl.textContent = '0';
         }
     }
 
@@ -7106,6 +7108,8 @@
         if (liveStats && liveStats.tbody) {
             appendSolveRow(liveStats.tbody, solve, BEST_KEYS);
         }
+        const headerEl = document.getElementById('solveCountHeader');
+        if (headerEl) headerEl.textContent = liveSolvesData.length;
     }
 
     // ---------- Live stats container creation ----------
@@ -7161,7 +7165,8 @@
             const thTime = document.createElement('th');
             thTime.textContent = 'HH:MM';
             const thNum = document.createElement('th');
-            thNum.textContent = '#';
+            thNum.id = 'solveCountHeader';
+            thNum.textContent = liveSolvesData.length;
             headerRow.appendChild(thTime);
             headerRow.appendChild(thNum);
             const labels = [
@@ -7288,6 +7293,8 @@
             fragment.appendChild(createSolveRow(liveSolvesData[i], rowKeys, liveSolvesData.length, false));
         }
         tbody.appendChild(fragment);
+        const headerEl = document.getElementById('solveCountHeader');
+        if (headerEl) headerEl.textContent = liveSolvesData.length;
     }
 
     function appendSolveRow(tbody, solve, rowKeys) {
