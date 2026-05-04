@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.40.5
+// @version      3.41.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -32,6 +32,9 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
+        .live-table td.pb-cell {
+            color: cyan !important;
+        }
         body {
             height: 100%;
         }
@@ -60,19 +63,20 @@
             color: #ddd;
             font-family: monospace;
             font-size: 13px;
-            overflow: hidden;         /* Keep this for the container */
+            overflow: hidden;         
             box-sizing: border-box;
             border-left: 2px solid #444;
             z-index: 9999;
-            display: flex;            /* Added: Use flex to control child */
-            flex-direction: column;   /* Added: Stack children vertically */
-            max-height: 100vh;        /* Added: Prevent container from exceeding viewport */
+            display: flex;            
+            flex-direction: column;   
+            max-height: 100vh;        
         }
 
         .live-table-wrapper {
-            overflow: auto;           /* Added: Enable scrolling */
-            flex: 1;                  /* Added: Take remaining space */
-            min-height: 0;            /* Added: Allow flex child to shrink */
+            overflow-x: hidden;
+            overflow-y: auto;           
+            flex: 1;                  
+            min-height: 0;            
         }
 
         .live-resize-handle {
@@ -92,14 +96,14 @@
 
         .live-table {
             width: auto;
-            min-width: 100%;          /* Added: Ensure table fills wrapper */
+            min-width: 95%;          
             border-collapse: collapse;
         }
 
         .live-table thead {
-            position: sticky;         /* Added: Keep header visible while scrolling */
-            top: 0;                   /* Added: Stick to top */
-            z-index: 1;               /* Added: Ensure header stays above body */
+            position: sticky;        
+            top: 0;                   
+            z-index: 1;              
         }
 
         .live-table th, .live-table td {
@@ -110,7 +114,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             box-sizing: border-box;
-            white-space: nowrap;      /* Added: Prevent text wrapping */
+            white-space: nowrap;     
         }
 
         .live-table thead th {
@@ -269,7 +273,7 @@
         .left-hack, .center-hack, .right-hack {
             position: fixed !important;
             top: 0 !important;
-            max-width: 300px;
+            max-width: 330px;
         }
         .left-hack td, .center-hack td, .right-hack td {
             font-size: 12px !important;
@@ -1223,7 +1227,7 @@
         }
         .standard-stats-panel {
             position: absolute !important;
-            right: 300px !important;
+            right: 330px !important;
             top: 0 !important;
             max-width: 250px !important;
             pointer-events: none;
@@ -3953,7 +3957,7 @@
                     }
                 } else {
                     td.style.fontWeight = 'normal';
-                    td.style.setProperty('font-size', '12px', 'important');
+                    td.style.setProperty('font-size', '14px', 'important');
                     td.style.color = '#fff';
                 }
             }
@@ -3979,6 +3983,7 @@
         if (state === "scrambled") {
             if (!(solveFromSameSession(getSolveFromTable()))) {
                 liveSolvesData.length = 0;
+                resetBestValues();
                 liveStats.update();
             }
             formatSingleSolve(false);
@@ -3997,7 +4002,8 @@
             if (hideHeaderDuringSolves && !isZenMode) {
                 toggleHeader(true);
             }
-            formatSingleSolve(true);
+            //formatSingleSolve(true);
+            highlightPBsInStatsGrid();
         } else {
             formatSingleSolve(false);
             initLiveContainer();
@@ -6924,6 +6930,75 @@
 
     const liveSolvesData = [];
 
+    // LIVE SESSION CODE
+
+    // ---------- Helper: parse complex time string to milliseconds ----------
+    function parseTimeToMs(timeStr) {
+        if (!timeStr || timeStr === 'DNF' || timeStr === '—') return null;
+        const parts = timeStr.trim().split(':');
+        if (parts.length > 3) return null;
+
+        let seconds = 0;
+        let minutes = 0;
+        let hours = 0;
+
+        if (parts.length === 1) {
+            seconds = parseFloat(parts[0]);
+        } else if (parts.length === 2) {
+            minutes = parseInt(parts[0], 10);
+            seconds = parseFloat(parts[1]);
+        } else if (parts.length === 3) {
+            hours = parseInt(parts[0], 10);
+            minutes = parseInt(parts[1], 10);
+            seconds = parseFloat(parts[2]);
+        }
+
+        if (isNaN(seconds)) return null;
+        return (hours * 3600 + minutes * 60 + seconds) * 1000;
+    }
+
+    // ---------- Global bests for each (key, metric) ----------
+    const BEST_KEYS = [1, 5, 12, 25, 50, 100];
+    const bestValues = {};
+
+    function resetBestValues() {
+        BEST_KEYS.forEach(k => {
+            bestValues[k] = {
+                timeMs: Infinity,
+                moves: Infinity,
+                tps: -Infinity
+            };
+        });
+    }
+    resetBestValues();
+
+    /**
+     * Scan existing liveSolvesData and set the bestValues thresholds
+     * (Does NOT mark old solves as PB – only future solves are checked.)
+     */
+    function computeInitialBestFromHistory() {
+        if (!liveSolvesData.length) return;
+        for (const solve of liveSolvesData) {
+            for (const k of BEST_KEYS) {
+                const data = solve[k];
+                if (!data || !data.timeMs) continue; // skip incomplete solves
+                if (data.timeMs !== null && data.timeMs < bestValues[k].timeMs) {
+                    bestValues[k].timeMs = data.timeMs;
+                }
+                if (data.movesNum !== null && data.movesNum < bestValues[k].moves) {
+                    bestValues[k].moves = data.movesNum;
+                }
+                if (data.tpsNum !== null && data.tpsNum > bestValues[k].tps) {
+                    bestValues[k].tps = data.tpsNum;
+                }
+            }
+        }
+    }
+
+    /**
+     * Create a solve object from the current stats-grid-container table.
+     * Returns null if container not found.
+     */
     function getSolveFromTable() {
         const container = document.querySelector('.stats-grid-container');
         if (!container) return null;
@@ -6942,12 +7017,24 @@
 
             if (keyIndex >= rowKeys.length) return;
 
-            const rowData = [];
-            for (let i = 1; i < cells.length; i++) {
-                rowData.push(cells[i].textContent.trim() || 'DNF');
-            }
+            const timeText = cells[1].textContent.trim() || 'DNF';
+            const movesText = cells[2].textContent.trim() || 'DNF';
+            const tpsText = cells[3].textContent.trim() || 'DNF';
 
-            solve[rowKeys[keyIndex]] = rowData;
+            const timeMs = parseTimeToMs(timeText);
+            const movesNum = (movesText === 'DNF' || movesText === '—') ? null : parseFloat(movesText);
+            const tpsNum = (tpsText === 'DNF' || tpsText === '—') ? null : (tpsText === '∞' ? Infinity : parseFloat(tpsText));
+
+            solve[rowKeys[keyIndex]] = {
+                timeText,
+                timeMs,
+                movesNum: isNaN(movesNum) ? null : movesNum,
+                tpsNum: isNaN(tpsNum) ? null : tpsNum,
+                pbtime: false,
+                pbmoves: false,
+                pbtps: false
+            };
+
             keyIndex++;
         });
 
@@ -6963,17 +7050,53 @@
         return solve;
     }
 
+    /**
+     * Check if two solves are from the same session (duplicate check).
+     */
     function solveFromSameSession(solve) {
         if (!liveSolvesData.length) return false;
         const last = liveSolvesData[liveSolvesData.length - 1];
         if (solve.session !== last.session) return false;
+
         for (const k of [5, 12, 25, 50, 100]) {
             const a = solve[k], b = last[k];
-            for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+            if (!a || !b) return false;
+            if (a.timeText !== b.timeText || a.movesNum !== b.movesNum || a.tpsNum !== b.tpsNum) {
+                return false;
+            }
         }
         return solve.solveCounter === last.solveCounter;
     }
 
+    /**
+     * Track a newly added solve: push to liveSolvesData, check & update PBs.
+     */
+    function trackSolve(solve) {
+        // Evaluate PB flags against current bestValues
+        for (const k of BEST_KEYS) {
+            const data = solve[k];
+            if (!data) continue;
+
+            // Time PB (lower is better)
+            if (data.timeMs !== null && data.timeMs < bestValues[k].timeMs) {
+                bestValues[k].timeMs = data.timeMs;
+                data.pbtime = true;
+            }
+            // Moves PB (lower is better)
+            if (data.movesNum !== null && data.movesNum < bestValues[k].moves) {
+                bestValues[k].moves = data.movesNum;
+                data.pbmoves = true;
+            }
+            // TPS PB (higher is better)
+            if (data.tpsNum !== null && data.tpsNum > bestValues[k].tps) {
+                bestValues[k].tps = data.tpsNum;
+                data.pbtps = true;
+            }
+        }
+        liveSolvesData.push(solve);
+    }
+
+    // ---------- Live stats container creation ----------
     function createLiveStatsContainer(parent = document.body) {
         const container = document.createElement('div');
         container.className = 'live-stats-container';
@@ -6983,7 +7106,7 @@
         handle.className = 'live-resize-handle';
 
         const tableWrapper = document.createElement('div');
-        tableWrapper.className = 'live-table-wrapper';  // Use the CSS class instead of inline styles
+        tableWrapper.className = 'live-table-wrapper';
 
         const table = document.createElement('table');
         table.className = 'live-table';
@@ -6991,9 +7114,10 @@
         const tbody = document.createElement('tbody');
         tbody.id = 'liveTableBody';
         const colgroup = document.createElement('colgroup');
+
         const ONECELL = 60;
         const CELLNUMBER = 20;
-        const rowKeys = [1, 5, 12, 25, 50, 100];
+        const rowKeys = BEST_KEYS;
         const timeColWidth = ONECELL;
         const statColWidth = ONECELL;
 
@@ -7001,7 +7125,6 @@
         colTime.style.width = timeColWidth + 'px';
         colgroup.appendChild(colTime);
 
-        // Add number column
         const colNum = document.createElement('col');
         colNum.style.width = statColWidth + 'px';
         colgroup.appendChild(colNum);
@@ -7029,14 +7152,16 @@
             thNum.textContent = '#';
             headerRow.appendChild(thTime);
             headerRow.appendChild(thNum);
+            const labels = [
+                { full: 'Time', short: 'T' },
+                { full: 'Moves', short: 'M' },
+                { full: 'TPS', short: 'S' }
+            ];
+
             rowKeys.forEach(k => {
-                ['Time', 'Moves', 'TPS'].forEach(label => {
+                labels.forEach(({ full, short }) => {
                     const th = document.createElement('th');
-                    if (k === 1) {
-                        th.textContent = `${label}`;
-                    } else {
-                        th.textContent = `ao${k}`;
-                    }
+                    th.textContent = k === 1 ? full : `${short} ao${k}`;
                     headerRow.appendChild(th);
                 });
             });
@@ -7045,14 +7170,13 @@
         }
         buildHeader();
 
-        const totalTableWidth = ONECELL * (CELLNUMBER);
+        const totalTableWidth = ONECELL * (CELLNUMBER + 1); //safety margin 
         table.style.width = totalTableWidth + 'px';
-        table.style.minWidth = totalTableWidth + 'px'; // Ensure minimum width
+        //table.style.minWidth = totalTableWidth + 'px';
 
-        // Container starts showing 5 columns worth of width
-        const initialVisibleWidth = (5 * ONECELL);
-        container.style.width = initialVisibleWidth + 'px';
-        container.style.maxHeight = '100vh'; // Prevent container from exceeding viewport
+        const initialVisibleWidth = 5 * ONECELL + 10;
+        container.style.width = initialVisibleWidth + 20 + 'px';
+        container.style.maxHeight = '100vh';
 
         let startX, startWidth;
         handle.addEventListener('mousedown', e => {
@@ -7066,14 +7190,17 @@
         function onMouseMove(e) {
             const dx = startX - e.clientX;
             let newWidth = startWidth + dx;
-            newWidth = Math.max(10, Math.min(ONECELL * CELLNUMBER, newWidth));
-            container.style.width = newWidth + 'px';
-            container.style.setProperty('width', newWidth + 'px', 'important');
+            newWidth = Math.max(10, Math.min(ONECELL * (CELLNUMBER + 1), newWidth));  //safety margin 
+            let containerW = newWidth;
+            if (containerW > 10) {
+                containerW = containerW + 20;
+            }
+            container.style.width = containerW + 'px';
 
-            const statsPanel = document.querySelector(".standard-stats-panel");
+            const statsPanel = document.querySelector('.standard-stats-panel');
             if (statsPanel) {
-                statsPanel.style.right = (newWidth) + 'px';
-                statsPanel.style.setProperty('right', (newWidth) + 'px', 'important');
+                statsPanel.style.right = containerW + 'px';
+                statsPanel.style.setProperty('right', containerW + 'px', 'important');
             }
         }
 
@@ -7087,10 +7214,14 @@
         return {
             container,
             tbody,
-            update: () => updateLiveStatsTable(tbody, rowKeys, timeColWidth, statColWidth)
+            update: () => updateLiveStatsTable(tbody, rowKeys)
         };
     }
 
+    /**
+     * Rebuild the live table body.
+     * PB cells get a 'pb-cell' class for cyan colour.
+     */
     function updateLiveStatsTable(tbody, rowKeys) {
         while (tbody.firstChild) {
             tbody.removeChild(tbody.firstChild);
@@ -7105,19 +7236,44 @@
                 d.getMinutes().toString().padStart(2, '0');
             const tr = document.createElement('tr');
 
+            // HH:MM cell
             const tdTime = document.createElement('td');
             tdTime.textContent = timeStr;
             tr.appendChild(tdTime);
 
+            // Solve number cell
             const tdNum = document.createElement('td');
             tdNum.textContent = solve.solveCounter;
             tr.appendChild(tdNum);
 
             rowKeys.forEach(k => {
-                const arr = solve[k] || [];
+                const data = solve[k];
+                if (!data) {
+                    // Fill with empty cells if solve data missing
+                    for (let j = 0; j < 3; j++) {
+                        const td = document.createElement('td');
+                        td.textContent = '—';
+                        tr.appendChild(td);
+                    }
+                    return;
+                }
+
+                const cellValues = [data.timeText, data.movesNum, data.tpsNum === Infinity ? '∞' : data.tpsNum];
+                const pbFlags = [data.pbtime, data.pbmoves, data.pbtps];
+
                 for (let j = 0; j < 3; j++) {
                     const td = document.createElement('td');
-                    td.textContent = arr[j].replace('DNF', '—') || '—';
+                    let content = cellValues[j];
+                    if (content === null || content === undefined || content === 'DNF' || content === '—') {
+                        content = '—';
+                    } else if (typeof content === 'number') {
+                        content = Number.isInteger(content) ? content.toString() : content.toFixed(3);
+                    }
+                    td.textContent = content;
+
+                    if (pbFlags[j]) {
+                        td.classList.add('pb-cell');
+                    }
                     tr.appendChild(td);
                 }
             });
@@ -7129,27 +7285,58 @@
     }
 
     let liveStats;
-    function initLiveContainer() {
-        const parent = document.querySelector(".standard-main-panel");
-        if (!parent) return;
-        if (parent.querySelector(".live-stats-container")) {
-            return;
-        }
 
-        if (!parent.querySelector(".main-content")) {
-            const wrapper = document.createElement("div");
-            wrapper.className = "main-content";
+    /**
+     * Initialise the live stats panel. Call this once after the page is ready.
+     */
+    function initLiveContainer() {
+        const parent = document.querySelector('.standard-main-panel');
+        if (!parent) return;
+        if (parent.querySelector('.live-stats-container')) return;
+
+        if (!parent.querySelector('.main-content')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'main-content';
             while (parent.firstChild) {
                 wrapper.appendChild(parent.firstChild);
             }
             parent.appendChild(wrapper);
         }
 
+        // Set best-value thresholds based on already captured solves
+        computeInitialBestFromHistory();
+
         liveStats = createLiveStatsContainer(parent);
     }
 
-    function trackSolve(solve) {
-        liveSolvesData.push(solve);
+    function highlightPBsInStatsGrid() {
+        const container = document.querySelector('.stats-grid-container');
+        if (!container) return;
+
+        const keyMap = { '1': 1, '5': 5, '12': 12, '25': 25, '50': 50, '100': 100 };
+        const metrics = [
+            { col: 'time', parse: v => parseTimeToMs(v), isPB: (v, b) => v !== null && v <= b },
+            { col: 'moves', parse: v => v === '∞' ? Infinity : parseFloat(v), isPB: (v, b) => !isNaN(v) && v <= b },
+            { col: 'tps', parse: v => v === '∞' ? Infinity : parseFloat(v), isPB: (v, b) => !isNaN(v) && v >= b }
+        ];
+
+        container.querySelectorAll('tr').forEach(row => {
+            const key = keyMap[row.getAttribute('avg')];
+            if (!key || !bestValues[key]) return;
+
+            metrics.forEach(({ col, parse, isPB }) => {
+                const cell = row.querySelector(`td[column="${col}"]`);
+                if (!cell) return;
+                const val = parse(cell.textContent.trim());
+                if (isPB(val, bestValues[key][col === 'tps' ? 'tps' : col === 'moves' ? 'moves' : 'timeMs'])) {
+                    cell.style.color = 'cyan';
+                    cell.style.fontWeight = 'bold';
+                } else {
+                    cell.style.color = '';
+                    cell.style.fontWeight = '';
+                }
+            });
+        });
     }
 
 })();
