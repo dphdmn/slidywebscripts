@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.41.3
+// @version      3.41.4
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4003,11 +4003,14 @@
             formatSingleSolve(false);
             initLiveContainer();
             if (liveStats) {
-                if (!(solveFromSameSession(getSolveFromTable()))) {
-                    liveSolvesData.length = 0;
-                    resetBestValues();
-                    clearLiveTable();
-                    resetPBStylesInStatsGrid();
+                const solveCheck = getSolveFromTable();
+                if (solveCheck) {
+                    if (!(solveFromSameSession(solveCheck))) {
+                        liveSolvesData.length = 0;
+                        resetBestValues();
+                        clearLiveTable();
+                        resetPBStylesInStatsGrid();
+                    }
                 }
             }
         }
