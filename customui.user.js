@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.41.0
+// @version      3.41.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3981,11 +3981,6 @@
         //console.log(state);
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (state === "scrambled") {
-            if (!(solveFromSameSession(getSolveFromTable()))) {
-                liveSolvesData.length = 0;
-                resetBestValues();
-                liveStats.update();
-            }
             formatSingleSolve(false);
             unlockKeys();
             scrambled = true;
@@ -4007,6 +4002,14 @@
         } else {
             formatSingleSolve(false);
             initLiveContainer();
+            if (liveStats) {
+                if (!(solveFromSameSession(getSolveFromTable()))) {
+                    liveSolvesData.length = 0;
+                    resetBestValues();
+                    liveStats.update();
+                    resetPBStylesInStatsGrid();
+                }
+            }
         }
         //updatePuzzleWidthCSS();
         updateButtonVisibility();
@@ -7012,7 +7015,7 @@
 
         rows.forEach(row => {
             const cells = row.querySelectorAll('td');
-
+            if (!cells[0]) return null;
             lastHeader = cells[0].textContent.trim();
 
             if (keyIndex >= rowKeys.length) return;
@@ -7050,20 +7053,18 @@
         return solve;
     }
 
-    /**
-     * Check if two solves are from the same session (duplicate check).
-     */
     function solveFromSameSession(solve) {
-        if (!liveSolvesData.length) return false;
+        if (!solve || !liveSolvesData.length) return false;
         const last = liveSolvesData[liveSolvesData.length - 1];
+        if (!last) return false;
         if (solve.session !== last.session) return false;
 
         for (const k of [5, 12, 25, 50, 100]) {
             const a = solve[k], b = last[k];
             if (!a || !b) return false;
-            if (a.timeText !== b.timeText || a.movesNum !== b.movesNum || a.tpsNum !== b.tpsNum) {
-                return false;
-            }
+            if (a.timeText !== b.timeText) return false;
+            if (a.movesNum !== b.movesNum) return false;
+            if (a.tpsNum !== b.tpsNum) return false;
         }
         return solve.solveCounter === last.solveCounter;
     }
@@ -7308,7 +7309,15 @@
 
         liveStats = createLiveStatsContainer(parent);
     }
+    function resetPBStylesInStatsGrid() {
+        const container = document.querySelector('.stats-grid-container');
+        if (!container) return;
 
+        container.querySelectorAll('td[column="time"], td[column="moves"], td[column="tps"]').forEach(cell => {
+            cell.style.color = '';
+            cell.style.fontWeight = '';
+        });
+    }
     function highlightPBsInStatsGrid() {
         const container = document.querySelector('.stats-grid-container');
         if (!container) return;
