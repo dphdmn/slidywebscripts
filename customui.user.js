@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.41.2
+// @version      3.41.3
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4006,7 +4006,7 @@
                 if (!(solveFromSameSession(getSolveFromTable()))) {
                     liveSolvesData.length = 0;
                     resetBestValues();
-                    liveStats.update();
+                    clearLiveTable();
                     resetPBStylesInStatsGrid();
                 }
             }
@@ -7068,10 +7068,12 @@
         }
         return solve.solveCounter === last.solveCounter;
     }
+    function clearLiveTable() {
+        if (liveStats?.tbody) {
+            liveStats.tbody.textContent = '';
+        }
+    }
 
-    /**
-     * Track a newly added solve: push to liveSolvesData, check & update PBs.
-     */
     function trackSolve(solve) {
         const totalSolves = liveSolvesData.length + 1; // +1 for the solve about to be added
 
@@ -7098,6 +7100,9 @@
             }
         }
         liveSolvesData.push(solve);
+        if (liveStats && liveStats.tbody) {
+            appendSolveRow(liveStats.tbody, solve, BEST_KEYS);
+        }
     }
 
     // ---------- Live stats container creation ----------
@@ -7222,70 +7227,69 @@
         };
     }
 
-    /**
-     * Rebuild the live table body.
-     * PB cells get a 'pb-cell' class for cyan colour.
-     */
-    function updateLiveStatsTable(tbody, rowKeys) {
-        while (tbody.firstChild) {
-            tbody.removeChild(tbody.firstChild);
-        }
+    function createSolveRow(solve, rowKeys, totalSolves, isNewest) {
+        const tr = document.createElement('tr');
+        const d = new Date(solve.timestamp);
+        const timeStr = d.getHours().toString().padStart(2, '0') + ':' +
+            d.getMinutes().toString().padStart(2, '0');
 
-        const fragment = document.createDocumentFragment();
+        const tdTime = document.createElement('td');
+        tdTime.textContent = timeStr;
+        tr.appendChild(tdTime);
 
-        for (let i = liveSolvesData.length - 1; i >= 0; i--) {
-            const solve = liveSolvesData[i];
-            const d = new Date(solve.timestamp);
-            const timeStr = d.getHours().toString().padStart(2, '0') + ':' +
-                d.getMinutes().toString().padStart(2, '0');
-            const tr = document.createElement('tr');
+        const tdNum = document.createElement('td');
+        tdNum.textContent = solve.solveCounter;
+        tr.appendChild(tdNum);
 
-            // HH:MM cell
-            const tdTime = document.createElement('td');
-            tdTime.textContent = timeStr;
-            tr.appendChild(tdTime);
-
-            // Solve number cell
-            const tdNum = document.createElement('td');
-            tdNum.textContent = solve.solveCounter;
-            tr.appendChild(tdNum);
-
-            rowKeys.forEach(k => {
-                const data = solve[k];
-                if (!data) {
-                    // Fill with empty cells if solve data missing
-                    for (let j = 0; j < 3; j++) {
-                        const td = document.createElement('td');
-                        td.textContent = '—';
-                        tr.appendChild(td);
-                    }
-                    return;
-                }
-
-                const cellValues = [data.timeText, data.movesNum, data.tpsNum === Infinity ? '∞' : data.tpsNum];
-                const pbFlags = [data.pbtime, data.pbmoves, data.pbtps];
-
+        rowKeys.forEach(k => {
+            const data = solve[k];
+            if (!data) {
                 for (let j = 0; j < 3; j++) {
                     const td = document.createElement('td');
-                    let content = cellValues[j];
-                    if (content === null || content === undefined || content === 'DNF' || content === '—') {
-                        content = '—';
-                    } else if (typeof content === 'number') {
-                        content = Number.isInteger(content) ? content.toString() : content.toFixed(3);
-                    }
-                    td.textContent = content;
-
-                    if (pbFlags[j]) {
-                        td.classList.add('pb-cell');
-                    }
+                    td.textContent = '—';
                     tr.appendChild(td);
                 }
-            });
+                return;
+            }
 
-            fragment.appendChild(tr);
+            const cellValues = [data.timeText, data.movesNum, data.tpsNum === Infinity ? '∞' : data.tpsNum];
+            const pbFlags = [data.pbtime, data.pbmoves, data.pbtps];
+
+            for (let j = 0; j < 3; j++) {
+                const td = document.createElement('td');
+                let content = cellValues[j];
+                if (content === null || content === undefined || content === 'DNF' || content === '—') {
+                    content = '—';
+                } else if (typeof content === 'number') {
+                    content = Number.isInteger(content) ? content.toString() : content.toFixed(3);
+                }
+                td.textContent = content;
+
+                if (isNewest && k > totalSolves) {
+                    td.style.color = 'gray';
+                } else if (pbFlags[j]) {
+                    td.classList.add('pb-cell');
+                }
+                tr.appendChild(td);
+            }
+        });
+
+        return tr;
+    }
+
+    function updateLiveStatsTable(tbody, rowKeys) {
+        if (tbody.firstChild) return; // Already populated, use append instead
+
+        const fragment = document.createDocumentFragment();
+        for (let i = liveSolvesData.length - 1; i >= 0; i--) {
+            fragment.appendChild(createSolveRow(liveSolvesData[i], rowKeys, liveSolvesData.length, false));
         }
-
         tbody.appendChild(fragment);
+    }
+
+    function appendSolveRow(tbody, solve, rowKeys) {
+        const totalSolves = liveSolvesData.length;
+        tbody.insertBefore(createSolveRow(solve, rowKeys, totalSolves, true), tbody.firstChild);
     }
 
     let liveStats;
