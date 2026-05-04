@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.40.3
+// @version      3.40.4
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -49,7 +49,7 @@
             min-width: 100px;      
             overflow: auto;       
         }
-        /* The live stats container – now a flex child */
+
         .live-stats-container {
             position: relative;     
             height: auto;            
@@ -60,10 +60,19 @@
             color: #ddd;
             font-family: monospace;
             font-size: 13px;
-            overflow: hidden;
+            overflow: hidden;         /* Keep this for the container */
             box-sizing: border-box;
             border-left: 2px solid #444;
-            z-index: 9999;          
+            z-index: 9999;
+            display: flex;            /* Added: Use flex to control child */
+            flex-direction: column;   /* Added: Stack children vertically */
+            max-height: 100vh;        /* Added: Prevent container from exceeding viewport */
+        }
+
+        .live-table-wrapper {
+            overflow: auto;           /* Added: Enable scrolling */
+            flex: 1;                  /* Added: Take remaining space */
+            min-height: 0;            /* Added: Allow flex child to shrink */
         }
 
         .live-resize-handle {
@@ -75,14 +84,24 @@
             z-index: 10;
             background: transparent;
         }
+
         .live-resize-handle:hover,
         .live-resize-handle:active {
             background: rgba(255,255,255,0.05);
         }
+
         .live-table {
             width: auto;
+            min-width: 100%;          /* Added: Ensure table fills wrapper */
             border-collapse: collapse;
         }
+
+        .live-table thead {
+            position: sticky;         /* Added: Keep header visible while scrolling */
+            top: 0;                   /* Added: Stick to top */
+            z-index: 1;               /* Added: Ensure header stays above body */
+        }
+
         .live-table th, .live-table td {
             padding: 4px 6px;
             border-right: 1px solid #333;
@@ -91,7 +110,9 @@
             overflow: hidden;
             text-overflow: ellipsis;
             box-sizing: border-box;
+            white-space: nowrap;      /* Added: Prevent text wrapping */
         }
+
         .live-table thead th {
             background: #2a2a2a;
             color: #aaa;
@@ -99,9 +120,10 @@
             font-size: 11px;
             border-bottom: 2px solid #444;
         }
+
         .live-table tbody tr:hover td {
             background: #252525;
-        }        
+        }
 
 
         .session-statistics-table th {
@@ -3971,7 +3993,6 @@
         } else if (state === "finished") {
             trackSolve(getSolveFromTable());
             liveStats.update();
-            console.log(liveSolvesData);
             scrambled = false;
             if (hideHeaderDuringSolves && !isZenMode) {
                 toggleHeader(true);
@@ -6962,8 +6983,7 @@
         handle.className = 'live-resize-handle';
 
         const tableWrapper = document.createElement('div');
-        tableWrapper.style.overflow = 'hidden';
-        tableWrapper.style.height = '100%';
+        tableWrapper.className = 'live-table-wrapper';  // Use the CSS class instead of inline styles
 
         const table = document.createElement('table');
         table.className = 'live-table';
@@ -6980,6 +7000,11 @@
         const colTime = document.createElement('col');
         colTime.style.width = timeColWidth + 'px';
         colgroup.appendChild(colTime);
+
+        // Add number column
+        const colNum = document.createElement('col');
+        colNum.style.width = statColWidth + 'px';
+        colgroup.appendChild(colNum);
 
         rowKeys.forEach(() => {
             for (let s = 0; s < 3; s++) {
@@ -7007,7 +7032,7 @@
             rowKeys.forEach(k => {
                 ['Time', 'Moves', 'TPS'].forEach(label => {
                     const th = document.createElement('th');
-                    if (k === 1){
+                    if (k === 1) {
                         th.textContent = `${label}`;
                     } else {
                         th.textContent = `ao${k}`;
@@ -7020,9 +7045,14 @@
         }
         buildHeader();
 
-        const totalTableWidth = ONECELL * CELLNUMBER;
+        const totalTableWidth = ONECELL * (CELLNUMBER);
         table.style.width = totalTableWidth + 'px';
-        container.style.width = (5 * ONECELL) + 'px';
+        table.style.minWidth = totalTableWidth + 'px'; // Ensure minimum width
+
+        // Container starts showing 5 columns worth of width
+        const initialVisibleWidth = (5 * ONECELL);
+        container.style.width = initialVisibleWidth + 'px';
+        container.style.maxHeight = '100vh'; // Prevent container from exceeding viewport
 
         let startX, startWidth;
         handle.addEventListener('mousedown', e => {
@@ -7036,10 +7066,10 @@
         function onMouseMove(e) {
             const dx = startX - e.clientX;
             let newWidth = startWidth + dx;
-            newWidth = Math.max(10, Math.min(ONECELL*CELLNUMBER, newWidth));
+            newWidth = Math.max(10, Math.min(ONECELL * CELLNUMBER, newWidth));
             container.style.width = newWidth + 'px';
             container.style.setProperty('width', newWidth + 'px', 'important');
-            
+
             const statsPanel = document.querySelector(".standard-stats-panel");
             if (statsPanel) {
                 statsPanel.style.right = (newWidth) + 'px';
@@ -7072,7 +7102,7 @@
             const solve = liveSolvesData[i];
             const d = new Date(solve.timestamp);
             const timeStr = d.getHours().toString().padStart(2, '0') + ':' +
-                            d.getMinutes().toString().padStart(2, '0');
+                d.getMinutes().toString().padStart(2, '0');
             const tr = document.createElement('tr');
 
             const tdTime = document.createElement('td');
@@ -7087,7 +7117,7 @@
                 const arr = solve[k] || [];
                 for (let j = 0; j < 3; j++) {
                     const td = document.createElement('td');
-                    td.textContent = arr[j].replace('DNF','—') || '—';
+                    td.textContent = arr[j].replace('DNF', '—') || '—';
                     tr.appendChild(td);
                 }
             });
@@ -7118,7 +7148,7 @@
         liveStats = createLiveStatsContainer(parent);
     }
 
-    function trackSolve(solve){
+    function trackSolve(solve) {
         liveSolvesData.push(solve);
     }
 
