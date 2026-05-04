@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.40.1
+// @version      3.40.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3847,7 +3847,7 @@
             setTimeout(() => {
                 applyGridsBorder(currentConfig.gridsBorderWidth, currentConfig.gridsBorderColor);
                 applyInactiveBrightness(currentConfig.inactiveBrightness);
-            }, 10);
+            }, 50);
         }
         if (e.key === 'a' || e.key === "A") {
             toggleEditingMode(e);
