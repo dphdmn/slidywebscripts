@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.40.4
+// @version      3.40.5
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -6967,7 +6967,7 @@
         if (!liveSolvesData.length) return false;
         const last = liveSolvesData[liveSolvesData.length - 1];
         if (solve.session !== last.session) return false;
-        for (const k of [1, 5, 12, 25, 50, 100]) {
+        for (const k of [5, 12, 25, 50, 100]) {
             const a = solve[k], b = last[k];
             for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
         }
