@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.41.1
+// @version      3.41.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -7073,8 +7073,11 @@
      * Track a newly added solve: push to liveSolvesData, check & update PBs.
      */
     function trackSolve(solve) {
-        // Evaluate PB flags against current bestValues
+        const totalSolves = liveSolvesData.length + 1; // +1 for the solve about to be added
+
         for (const k of BEST_KEYS) {
+            if (k > totalSolves) continue; // Not enough solves for this aoN to be valid
+
             const data = solve[k];
             if (!data) continue;
 
@@ -7322,6 +7325,7 @@
         const container = document.querySelector('.stats-grid-container');
         if (!container) return;
 
+        const totalSolves = liveSolvesData.length;
         const keyMap = { '1': 1, '5': 5, '12': 12, '25': 25, '50': 50, '100': 100 };
         const metrics = [
             { col: 'time', parse: v => parseTimeToMs(v), isPB: (v, b) => v !== null && v <= b },
@@ -7332,6 +7336,7 @@
         container.querySelectorAll('tr').forEach(row => {
             const key = keyMap[row.getAttribute('avg')];
             if (!key || !bestValues[key]) return;
+            if (key > totalSolves) return; // Not enough solves for this aoN
 
             metrics.forEach(({ col, parse, isPB }) => {
                 const cell = row.querySelector(`td[column="${col}"]`);
