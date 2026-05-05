@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.42.0
+// @version      3.43.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3613,14 +3613,9 @@
         const hideTimer = currentConfig.hideTimerDuringSolves;
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
-        container.classList.remove('center-hack', 'right-hack');
-        if (hideHeaderDuringSolves || isZenMode) {
-            if (scrambled && !isZenMode) {
-                container.classList.add('right-hack');
-            }
-            if (isZenMode && !isCornerMode) {
-                container.classList.add('center-hack');
-            }
+        container.classList.remove('right-hack');
+        if (isZenMode || (hideHeaderDuringSolves && scrambled)) {
+            container.classList.add('right-hack');
         }
         const thRow = container.querySelector('tr:has(th)');
         if (thRow) thRow.remove();
@@ -4262,6 +4257,15 @@
         }
     }
 
+    function toggleLiveOpacity(shown) {
+        const liveStats = document.getElementById('liveStatsContainer');
+        if (!liveStats) return;
+        if (shown) {
+            liveStats.style.opacity = '';
+        } else {
+            liveStats.style.opacity = 0;
+        }
+    }
 
     function enterZenMode() {
         const mainContent = document.querySelector('.focus-container');
@@ -4270,7 +4274,7 @@
         toggleHeader(false);
         isZenMode = true;
         replaceText();
-
+        toggleLiveOpacity(false);
     }
 
     function exitZenMode() {
@@ -4280,6 +4284,7 @@
         }
         isZenMode = false;
         replaceText();
+        toggleLiveOpacity(true);
     }
 
     function formatSingleSolve(finished) {
@@ -7546,22 +7551,37 @@
             document.addEventListener('mouseup', onMouseUp);
         });
 
-        function onMouseMove(e) {
-            const dx = startX - e.clientX;
-            let newWidth = startWidth + dx;
-            newWidth = Math.max(10, Math.min(ONECELL * (CELLNUMBER + 1), newWidth));  //safety margin 
-            let containerW = newWidth;
-            if (containerW > 10) {
-                containerW = containerW + 20;
-            }
-            container.style.width = containerW + 'px';
-
-            const statsPanel = document.querySelector('.standard-stats-panel');
-            if (statsPanel) {
-                statsPanel.style.right = containerW + 'px';
-                statsPanel.style.setProperty('right', containerW + 'px', 'important');
-            }
+    function onMouseMove(e) {
+        const dx = startX - e.clientX;
+        let newWidth = startWidth + dx;
+        newWidth = Math.max(10, Math.min(ONECELL * (CELLNUMBER + 1), newWidth));  //safety margin 
+        let containerW = newWidth;
+        if (containerW > 10) {
+            containerW = containerW + 20;
         }
+        
+        // Snap to 330px when within 15px range
+        const snapTarget = 330;
+        const snapRange = 15;
+        if (Math.abs(containerW - snapTarget) <= snapRange) {
+            containerW = snapTarget;
+        }
+        
+        container.style.width = containerW + 'px';
+
+        // Hide scrollbar when width is 10px or less
+        if (containerW <= 10) {
+            tableWrapper.style.overflowY = 'hidden';
+        } else {
+            tableWrapper.style.overflowY = 'auto';
+        }
+
+        const statsPanel = document.querySelector('.standard-stats-panel');
+        if (statsPanel) {
+            statsPanel.style.right = containerW + 'px';
+            statsPanel.style.setProperty('right', containerW + 'px', 'important');
+        }
+    }
 
         function onMouseUp() {
             document.removeEventListener('mousemove', onMouseMove);
