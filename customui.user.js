@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.43.0
+// @version      3.44.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3982,21 +3982,6 @@
         }
     }
 
-    function preventMutationSpam(mutations) {
-        if (mutations.length > 3) return false;
-        for (const mutation of mutations) {
-            const target = mutation.target.closest?.('tr');
-            if (!target) continue;
-
-            if (target.getAttribute('avg') === '1') {
-                mainObserver.observe(document.body, { childList: true, subtree: true });
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     function detectPuzzleState(mutations) {
         let sawStatsUpdate = false;
         let puzzleChanged = false;
@@ -4319,9 +4304,10 @@
             root.style.setProperty('--puzzle-width', `${puzzle.clientWidth * parseFloat(zoomFactor)}px`);
         }
     }
+
     const mainObserver = new MutationObserver((mutations) => {
+        if (mutations.length === 3 && mutations[0].target.closest('tr[avg="1"]')) return; //prevent timer spam
         mainObserver.disconnect();
-        if (preventMutationSpam(mutations)) return;
         //console.log('Mutations observed:', mutations.length);
         //logMutationDetails(mutations);
         const state = detectPuzzleState(mutations);
