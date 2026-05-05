@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.46.0
+// @version      3.47.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3071,6 +3071,26 @@
         }
     }
 
+    function centerPuzzle() {
+        const puzzleContainer = document.querySelector('.puzzle-container');
+        if (!puzzleContainer) return;
+        
+        const containerRect = puzzleContainer.getBoundingClientRect();
+        const containerWidth = containerRect.width;
+        const containerHeight = containerRect.height;
+        
+        const liveStatsContainer = document.querySelector('.live-stats-container');
+        const statsWidth = liveStatsContainer ? liveStatsContainer.offsetWidth : 0;
+        
+        const pendingLeft = (window.innerWidth - containerWidth) / 2 - statsWidth / 2;
+        const pendingTop = (window.innerHeight - containerHeight - 30) / 2;
+        
+        puzzleContainer.style.left = pendingLeft + 'px';
+        puzzleContainer.style.top = pendingTop + 'px';
+        settings.puzzleLeft.setValue(pendingLeft);
+        settings.puzzleTop.setValue(pendingTop);
+    }
+
     function enterEditMode() {
         const puzzleContainer = document.querySelector('.puzzle-container');
         const wasCentered = !isCornerMode;
@@ -3097,20 +3117,7 @@
         adjustButton.textContent = '✅ Done';
 
         if (wasCentered) {
-            const containerRect = puzzleContainer.getBoundingClientRect();
-            const containerWidth = containerRect.width;
-            const containerHeight = containerRect.height;
-            
-            const liveStatsContainer = document.querySelector('.live-stats-container');
-            const statsWidth = liveStatsContainer ? liveStatsContainer.offsetWidth : 0;
-            
-            const pendingLeft = (window.innerWidth - containerWidth) / 2 - statsWidth / 2;
-            const pendingTop = (window.innerHeight - containerHeight - 30) / 2;
-            
-            puzzleContainer.style.left = pendingLeft + 'px';
-            puzzleContainer.style.top = pendingTop + 'px';
-            settings.puzzleLeft.setValue(pendingLeft);
-            settings.puzzleTop.setValue(pendingTop);
+            centerPuzzle();
         }
         
     }
@@ -4341,6 +4348,7 @@
     }
 
     function applyNonPuzzleMutations(mutations) {
+        positionApplied = false;
         if (currentConfig.minimizeSessions) {
             minimizeSessions();
         }
@@ -4393,7 +4401,7 @@
         }
         initSound();
         applyPuzzlePosition();
-        if (!isEditingMode && !positionApplied && currentConfig.puzzleAlwaysInCenter) {
+        if (!positionApplied && currentConfig.puzzleAlwaysInCenter) {
             toggleCenterPosition();
         }
 
