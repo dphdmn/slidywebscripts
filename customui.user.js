@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.45.0
+// @version      3.46.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3073,13 +3073,13 @@
 
     function enterEditMode() {
         const puzzleContainer = document.querySelector('.puzzle-container');
-        isCornerMode = true;
+        const wasCentered = !isCornerMode;
         if (!puzzleContainer) return;
-
+        const focusArea = document.querySelector('.focus-area');
+        isCornerMode = true;
         setTimeout(() => {
-            const element = document.querySelector('.focus-area');
-            if (element) {
-                element.focus();
+            if (focusArea) {
+                focusArea.focus();
             }
         }, 10);
         dragHandle = document.createElement('div');
@@ -3095,6 +3095,24 @@
 
         isEditingMode = true;
         adjustButton.textContent = '✅ Done';
+
+        if (wasCentered) {
+            const containerRect = puzzleContainer.getBoundingClientRect();
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+            
+            const liveStatsContainer = document.querySelector('.live-stats-container');
+            const statsWidth = liveStatsContainer ? liveStatsContainer.offsetWidth : 0;
+            
+            const pendingLeft = (window.innerWidth - containerWidth) / 2 - statsWidth / 2;
+            const pendingTop = (window.innerHeight - containerHeight - 30) / 2;
+            
+            puzzleContainer.style.left = pendingLeft + 'px';
+            puzzleContainer.style.top = pendingTop + 'px';
+            settings.puzzleLeft.setValue(pendingLeft);
+            settings.puzzleTop.setValue(pendingTop);
+        }
+        
     }
 
     function exitEditMode() {
