@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.44.0
+// @version      3.45.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3180,6 +3180,7 @@
     }
 
     function insertControls() {
+        hideLogoutButton();
         const header = document.querySelector('.header');
 
         const button = createSeeStatsButton();
@@ -4305,19 +4306,45 @@
         }
     }
 
-    const mainObserver = new MutationObserver((mutations) => {
-        if (mutations.length === 3 && mutations[0].target.closest('tr[avg="1"]')) return; //prevent timer spam
-        mainObserver.disconnect();
-        //console.log('Mutations observed:', mutations.length);
-        //logMutationDetails(mutations);
+    function hideLogoutButton() {
+        const dropdown = document.querySelector('.user-menu .username-dropdown');
+        if (!dropdown) return;
+
+        const logoutBtn = dropdown.querySelector('.item');
+        if (logoutBtn?.textContent.trim() === 'Log out') {
+            logoutBtn.style.display = 'none';
+        }
+
+        const visible = [...dropdown.children].filter(child =>
+            child.style.display !== 'none' && getComputedStyle(child).display !== 'none'
+        );
+
+        if (visible.length <= 1) dropdown.style.display = 'none';
+    }
+
+    function applyNonPuzzleMutations(mutations) {
+        if (currentConfig.minimizeSessions) {
+            minimizeSessions();
+        }
+        if (isEditingMode) {
+            exitEditMode();
+        }
+    }
+
+    function applyGenericMutations(mutations) {
+        updateButtonVisibility();
+        applyUIOpacity(currentConfig.uiOpacity);
+
+    }
+
+    function applyPuzzleMutations(mutations) {
         const state = detectPuzzleState(mutations);
-        //console.log(state);
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (state === "scrambled") {
             formatSingleSolve(false);
             unlockKeys();
             scrambled = true;
-            if (hideHeaderDuringSolves || isZenMode) {
+            if (hideHeaderDuringSolves) {
                 toggleHeader(false);
             }
             if (isEditingMode) {
@@ -4330,7 +4357,6 @@
             if (hideHeaderDuringSolves && !isZenMode) {
                 toggleHeader(true);
             }
-            //formatSingleSolve(true);
             highlightPBsInStatsGrid();
         } else {
             formatSingleSolve(false);
@@ -4347,45 +4373,16 @@
                 }
             }
         }
-        //updatePuzzleWidthCSS();
-        updateButtonVisibility();
         initSound();
         applyPuzzlePosition();
         if (!isEditingMode && !positionApplied && currentConfig.puzzleAlwaysInCenter) {
             toggleCenterPosition();
-        } else {
-            //isCornerMode = true;
         }
-        applyUIOpacity(currentConfig.uiOpacity);
 
         replaceText();
 
         if (currentConfig.base9) {
             convertBase9();
-        }
-
-        if (currentConfig.minimizeSessions) {
-            minimizeSessions();
-        }
-
-        if (isEditingMode && !document.querySelector('.puzzle-container')) {
-            exitEditMode();
-        }
-
-        const logoutButton = document.querySelector('.user-menu .username-dropdown .item');
-        if (logoutButton && logoutButton.textContent.trim() === 'Log out') {
-            logoutButton.style.display = 'none';
-        }
-
-        const dropdown = document.querySelector('.user-menu .username-dropdown');
-        if (dropdown) {
-            const visibleChildren = Array.from(dropdown.children).filter(child => {
-                return child.style.display !== 'none' &&
-                    window.getComputedStyle(child).display !== 'none';
-            });
-            if (visibleChildren.length <= 1) {
-                dropdown.style.display = 'none';
-            }
         }
 
         applyGridsBorder(currentConfig.gridsBorderWidth, currentConfig.gridsBorderColor);
@@ -4398,6 +4395,20 @@
         } else {
             restoreInputs();
         }
+    }
+
+    const mainObserver = new MutationObserver((mutations) => {
+        if (mutations.length === 3 && mutations[0].target.closest('tr[avg="1"]')) return; //prevent timer spam
+        mainObserver.disconnect();
+        const isPuzzleMutation = !!document.querySelector('.focus-area');
+        //console.log('Mutations observed:', mutations.length);
+        //logMutationDetails(mutations);
+        if (isPuzzleMutation) {
+            applyPuzzleMutations(mutations);
+        } else {
+            applyNonPuzzleMutations(mutations);
+        }
+        applyGenericMutations(mutations);
 
         mainObserver.observe(document.body, { childList: true, subtree: true });
     });
@@ -7537,37 +7548,37 @@
             document.addEventListener('mouseup', onMouseUp);
         });
 
-    function onMouseMove(e) {
-        const dx = startX - e.clientX;
-        let newWidth = startWidth + dx;
-        newWidth = Math.max(10, Math.min(ONECELL * (CELLNUMBER + 1), newWidth));  //safety margin 
-        let containerW = newWidth;
-        if (containerW > 10) {
-            containerW = containerW + 20;
-        }
-        
-        // Snap to 330px when within 15px range
-        const snapTarget = 330;
-        const snapRange = 15;
-        if (Math.abs(containerW - snapTarget) <= snapRange) {
-            containerW = snapTarget;
-        }
-        
-        container.style.width = containerW + 'px';
+        function onMouseMove(e) {
+            const dx = startX - e.clientX;
+            let newWidth = startWidth + dx;
+            newWidth = Math.max(10, Math.min(ONECELL * (CELLNUMBER + 1), newWidth));  //safety margin 
+            let containerW = newWidth;
+            if (containerW > 10) {
+                containerW = containerW + 20;
+            }
 
-        // Hide scrollbar when width is 10px or less
-        if (containerW <= 10) {
-            tableWrapper.style.overflowY = 'hidden';
-        } else {
-            tableWrapper.style.overflowY = 'auto';
-        }
+            // Snap to 330px when within 15px range
+            const snapTarget = 330;
+            const snapRange = 15;
+            if (Math.abs(containerW - snapTarget) <= snapRange) {
+                containerW = snapTarget;
+            }
 
-        const statsPanel = document.querySelector('.standard-stats-panel');
-        if (statsPanel) {
-            statsPanel.style.right = containerW + 'px';
-            statsPanel.style.setProperty('right', containerW + 'px', 'important');
+            container.style.width = containerW + 'px';
+
+            // Hide scrollbar when width is 10px or less
+            if (containerW <= 10) {
+                tableWrapper.style.overflowY = 'hidden';
+            } else {
+                tableWrapper.style.overflowY = 'auto';
+            }
+
+            const statsPanel = document.querySelector('.standard-stats-panel');
+            if (statsPanel) {
+                statsPanel.style.right = containerW + 'px';
+                statsPanel.style.setProperty('right', containerW + 'px', 'important');
+            }
         }
-    }
 
         function onMouseUp() {
             document.removeEventListener('mousemove', onMouseMove);
