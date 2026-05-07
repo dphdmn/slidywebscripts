@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.52.0
+// @version      3.53.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -85,6 +85,7 @@
             top: 0; bottom: 0;
             width: 12px;
             cursor: col-resize;
+            touch-action: none;
             z-index: 10;
             background: transparent;
         }
@@ -7892,15 +7893,17 @@
         container.style.maxHeight = '100vh';
 
         let startX, startWidth;
-        handle.addEventListener('mousedown', e => {
+        handle.addEventListener('pointerdown', e => {
             e.preventDefault();
+            handle.setPointerCapture?.(e.pointerId);
             startX = e.clientX;
             startWidth = container.offsetWidth;
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+            document.addEventListener('pointercancel', onPointerUp);
         });
 
-        function onMouseMove(e) {
+        function onPointerMove(e) {
             const dx = startX - e.clientX;
             let newWidth = startWidth + dx;
             newWidth = Math.max(10, Math.min(ONECELL * (totalColumns + 1), newWidth));  //safety margin
@@ -7932,9 +7935,11 @@
             }
         }
 
-        function onMouseUp() {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
+        function onPointerUp(e) {
+            handle.releasePointerCapture?.(e.pointerId);
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+            document.removeEventListener('pointercancel', onPointerUp);
         }
 
         parent.appendChild(container);
