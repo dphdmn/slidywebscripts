@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.48.0
+// @version      3.49.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -947,10 +947,10 @@
             color: #e0e0e0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow-y: auto;
-            min-height: 640px;
+            min-height: 330px;
         }
         .avgs-calculator-container.no-graphs {
-            min-height: 350px;
+            min-height: 330px;
         }
         .avgs-calculator-container.collapsed {
             min-height: 0;
@@ -1017,22 +1017,28 @@
             color: cyan;
             font-weight: 500;
         }
-        .avgs-control-label {
+        .avgs-filters-container .avgs-control-label {
             color: cyan;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
-            margin-right: 8px;
-            min-width: 60px;
+            min-width: 70px;
+            line-height: 1.2;
+            flex: 0 0 70px;
         }
-        .date-filter-high {
-            position: relative;
-            bottom: 6px;
+        .avgs-filters-container .date-filter-high {
+            color: cyan;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: auto;
+            flex: 0 0 auto;
         }
         .avgs-layout-main {
             display: flex;
-            gap: 20px;
-            min-height: 300px;
+            gap: 12px;
+            height: 300px;
+            max-height: 300px;
             flex-wrap: wrap;
+            align-items: stretch;
         }
         .avgs-left-section,
         .avgs-middle-section,
@@ -1041,57 +1047,105 @@
             min-width: 300px;
             display: flex;
             flex-direction: column;
+            height: 300px;
+            max-height: 300px;
+            min-height: 0;
         }
         @media screen and (max-width: 1100px) {
+            .avgs-layout-main {
+                height: auto;
+                max-height: none;
+            }
+
             .avgs-left-section,
             .avgs-middle-section,
             .avgs-right-section {
                 width: 100%;
                 max-width: 100%;
+                height: 300px;
             }
         }
         .avgs-filters-container {
             background: #222;
-            padding: 12px;
+            padding: 10px;
             border: 1px solid #555;
-            min-height: 284px;
+            height: 100%;
+            min-height: 0;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
         }
-        .avgs-filter-row {
+        .avgs-filters-container .avgs-filter-row {
             display: flex;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 0;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 5px 8px;
         }
-        .avgs-filter-row:last-child {
+        .avgs-filters-container .avgs-filter-row:last-child {
             margin-bottom: 0;
         }
-        .avgs-filter-input,
-        .avgs-date-input {
+        .avgs-filters-container .avgs-filter-controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            flex: 1 1 230px;
+            min-width: 0;
+        }
+        .avgs-filters-container .avgs-radio-group {
+            gap: 5px;
+        }
+        .avgs-filters-container .avgs-radio-label {
+            padding: 4px 8px;
+            font-size: 11px;
+            min-height: 24px;
+            box-sizing: border-box;
+        }
+        .avgs-filters-container .avgs-filter-input,
+        .avgs-filters-container .avgs-date-input,
+        .avgs-filters-container .avgs-session-select {
             background: rgba(80, 80, 80, 0.8);
             border: 1px solid #555;
             color: #fff;
-            padding: 4px 8px;
+            padding: 3px 7px;
             min-width: 90px;
             max-width: 90px;
-            font-size: 13px;
+            font-size: 12px;
         }
-        .avgs-filter-input:focus,
-        .avgs-date-input:focus {
+        .avgs-filters-container .avgs-filter-input:focus,
+        .avgs-filters-container .avgs-date-input:focus,
+        .avgs-filters-container .avgs-session-select:focus {
             outline: none;
             border-color: #999;
+        }
+        .avgs-filters-container .avgs-session-select {
+            min-width: 230px;
+            max-width: 100%;
+            flex: 1 1 230px;
+        }
+        .avgs-filters-container .avgs-checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 26px;
+            margin: 0;
         }
         .avgs-date-row {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        .avgs-action-row {
+        .avgs-filters-container .avgs-action-row {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding-top: 8px;
+            gap: 8px;
+            padding-top: 6px;
+            margin-top: auto;
             border-top: 1px solid #555;
+            flex-wrap: wrap;
         }
         #avgs-start-date,
         #avgs-end-date {
@@ -1139,7 +1193,7 @@
         }
         .avgs-progress-bar {
             width: 100%;
-            height: 20px;
+            height: 16px;
             accent-color: #888;
         }
         .avgs-progress-text {
@@ -1148,43 +1202,58 @@
             min-width: 45px;
         }
 
-        .avgs-range-separator {
+        .avgs-filters-container .avgs-range-separator {
             color: #999;
             margin: 0 2px;
         }
 
-        .avgs-date-range {
+        .avgs-filters-container .avgs-date-range {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
             flex-wrap: wrap;
+            flex: 1 1 220px;
         }
 
-        .avgs-quick-dates {
+        .avgs-filters-container .avgs-quick-dates {
             display: flex;
-            gap: 4px;
+            gap: 5px;
+            flex-wrap: wrap;
+            padding-left: 78px;
         }
 
-        .avgs-quick-date-btn {
+        .avgs-filters-container .avgs-quick-date-btn {
             background: rgba(80, 80, 80, 0.6);
             border: 1px solid #555;
             color: #ccc;
-            padding: 8px 8px;
-            font-size: 12px;
+            padding: 4px 7px;
+            font-size: 11px;
             cursor: pointer;
             transition: all 0.1s;
             border-radius: 0 !important;
+            min-height: 24px;
         }
 
-        .avgs-quick-date-btn:hover {
+        .avgs-filters-container .avgs-quick-date-btn:hover {
             background: rgba(100, 100, 100, 0.8);
             color: #fff;
         }
 
-        .avgs-end-date-row {
+        @media screen and (max-width: 640px) {
+            .avgs-filters-container .avgs-control-label {
+                flex-basis: 100%;
+                min-width: 0;
+            }
+
+            .avgs-filters-container .avgs-quick-dates {
+                padding-left: 0;
+            }
+        }
+
+        .avgs-filters-container .avgs-end-date-row {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
         }
 
         .avgs-calc-btn,
@@ -1224,21 +1293,25 @@
         .avgs-output-area {
             width: 100%;
             flex: 1;
-            min-height: 200px;
-            max-height: 500px;
+            min-height: 0;
+            max-height: none;
             background: #222;
             border: 1px solid #555;
             color: #e0e0e0;
-            padding: 12px;
+            padding: 8px 10px;
             font-family: 'JetBrains Mono', 'Fira Code', monospace;
             font-size: 12px;
-            line-height: 1.5;
-            resize: vertical;
+            line-height: 1.35;
+            resize: none;
             box-sizing: border-box;
         }
         .avgs-output-area:focus {
             outline: none;
             border-color: #999;
+        }
+        #avgs-session-stats-container {
+            height: 100%;
+            min-height: 0;
         }
         .avgs-hint {
             color: #999;
@@ -1246,25 +1319,28 @@
             margin-left: 4px;
         }
         .avgs-session-stats {
-            padding: 6px 12px;
+            padding: 8px 10px;
             background: #222;
             border: 1px solid #555;
+            height: 100%;
+            box-sizing: border-box;
+            overflow-y: auto;
         }
         .avgs-session-stats-title {
             color: cyan;
             font-size: 13px;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .avgs-session-stats-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 6px;
+            gap: 4px;
         }
         .avgs-stat-item {
             display: flex;
             align-items: baseline;
-            font-size: 12px;
+            font-size: 11px;
         }
         .avgs-stat-label {
             color: #aaa;
@@ -1276,8 +1352,8 @@
             font-family: 'JetBrains Mono', 'Fira Code', monospace;
         }
         .avgs-best-solves {
-            margin-top: 8px;
-            padding-top: 8px;
+            margin-top: 6px;
+            padding-top: 6px;
             border-top: 1px solid #555;
             text-align: center;
         }
@@ -1295,10 +1371,13 @@
             background: #222;
             border: 1px solid #555;
             border-bottom: none;
-            padding: 8px 12px;
+            padding: 6px 10px;
             color: cyan;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
+            max-height: 52px;
+            overflow-y: auto;
+            box-sizing: border-box;
         }
         .avgs-custom-input {
             background: rgba(80, 80, 80, 0.8);
@@ -4510,6 +4589,7 @@
         let sessionStatsDiv = null;
         let filterSummaryDiv = null;
         let worker = null; // Web Worker reference for calculations
+        const SESSION_GAP_MS = 60 * 60 * 1000;
 
         // Chart variables
         let chart1 = null;
@@ -5457,8 +5537,16 @@
         function filterSolves(solves) {
             const startId = parseInt(document.querySelector('#avgs-start-id')?.value) || null;
             const endId = parseInt(document.querySelector('#avgs-end-id')?.value) || null;
+            const selectedSession = document.querySelector('#avgs-session-select')?.value || 'all';
 
             let filtered = solves;
+
+            if (selectedSession !== 'all') {
+                const [sessionStartId, sessionEndId] = selectedSession.split(':').map(Number);
+                if (!Number.isNaN(sessionStartId) && !Number.isNaN(sessionEndId)) {
+                    filtered = filtered.filter(solve => solve.solveId >= sessionStartId && solve.solveId <= sessionEndId);
+                }
+            }
 
             if (startId !== null || endId !== null) {
                 filtered = filtered.filter(solve => {
@@ -5497,6 +5585,95 @@
             }
 
             return filtered;
+        }
+
+        function formatSessionDate(date) {
+            if (!date) return 'Unknown date';
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatSessionTime(date) {
+            if (!date) return '--:--';
+            const hours = String(date.getUTCHours()).padStart(2, '0');
+            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        function getSolveSessions(solves) {
+            const datedSolves = solves
+                .filter(solve => solve.date)
+                .slice()
+                .sort((a, b) => a.date - b.date || a.solveId - b.solveId);
+            const sessions = [];
+            let current = null;
+
+            datedSolves.forEach(solve => {
+                const shouldStartSession = !current || (solve.date - current.lastDate) > SESSION_GAP_MS;
+                if (shouldStartSession) {
+                    current = {
+                        startId: solve.solveId,
+                        endId: solve.solveId,
+                        firstDate: solve.date,
+                        lastDate: solve.date,
+                        count: 1
+                    };
+                    sessions.push(current);
+                    return;
+                }
+
+                current.endId = solve.solveId;
+                current.lastDate = solve.date;
+                current.count += 1;
+            });
+
+            return sessions.sort((a, b) => b.lastDate - a.lastDate || b.endId - a.endId);
+        }
+
+        function updateSessionFilterOptions(solves = extractSolvesFromTable()) {
+            const select = document.querySelector('#avgs-session-select');
+            if (!select) return;
+
+            const previousValue = select.value || 'all';
+            const sessions = getSolveSessions(solves);
+            select.innerHTML = '<option value="all">All sub-sessions</option>';
+
+            sessions.forEach((session, index) => {
+                const option = document.createElement('option');
+                option.value = `${session.startId}:${session.endId}`;
+                const dateText = formatSessionDate(session.lastDate);
+                const timeText = formatSessionTime(session.lastDate);
+                const countText = session.count === 1 ? '1 solve' : `${session.count} solves`;
+                const latestText = index === 0 ? 'Latest - ' : '';
+                option.textContent = `${dateText} - ${timeText} - ${countText}`;
+                select.appendChild(option);
+            });
+
+            select.value = Array.from(select.options).some(option => option.value === previousValue) ? previousValue : 'all';
+        }
+
+        function applySolveRowFilters(solves) {
+            if (useDetailsForStats) return;
+
+            const table = document.querySelector('.session-statistics-table');
+            const rows = table?.querySelectorAll('tbody tr');
+            if (!rows) return;
+
+            const visibleIds = new Set(filterSolves(solves).map(solve => solve.solveId));
+            rows.forEach(row => {
+                const solveId = parseInt(row.querySelectorAll('td')[0]?.textContent.trim()) || 0;
+                row.style.display = visibleIds.has(solveId) ? '' : 'none';
+            });
+        }
+
+        function clearSolveRowFilters() {
+            const table = document.querySelector('.session-statistics-table');
+            const rows = table?.querySelectorAll('tbody tr');
+            rows?.forEach(row => {
+                row.style.display = '';
+            });
         }
 
         function getSelectedAvgSizes() {
@@ -5550,10 +5727,18 @@
 
             const startId = document.querySelector('#avgs-start-id')?.value;
             const endId = document.querySelector('#avgs-end-id')?.value;
+            const sessionSelect = document.querySelector('#avgs-session-select');
+            const selectedSessionText = sessionSelect?.value && sessionSelect.value !== 'all'
+                ? sessionSelect.options[sessionSelect.selectedIndex]?.textContent
+                : '';
 
             const useDateRange = document.querySelector('#avgs-use-date-range')?.checked || false;
 
             let filterText = `Best averages in session, using ${trimText} outliers, best ${categoryText} values`;
+
+            if (selectedSessionText) {
+                filterText += `, ${selectedSessionText}`;
+            }
 
             if (startId || endId) {
                 filterText += `, solves`;
@@ -5877,14 +6062,17 @@
             }
 
             const resetBtn = document.querySelector('.avgs-reset-btn');
+            if (!useDetailsForStats) updateSessionFilterOptions(allSolves);
             updateFilterSummary();
             if (!useDetailsForStats) {
                 const table = document.querySelector('.session-statistics-table')
                 addSortingListeners(table);
                 sortTable(table, 0, 'desc'); //reverse id by default
                 solves = filterSolves(allSolves);
+                applySolveRowFilters(allSolves);
                 if (resetBtn) resetBtn.style.display = 'none';
             } else {
+                clearSolveRowFilters();
                 if (resetBtn) resetBtn.style.display = 'block';
                 solves = fixDetailsSolvesData(allSolves);
                 type = getReplayType(solves);
@@ -6184,7 +6372,7 @@
                             <div class="avgs-filters-container">
                                 <div class="avgs-filter-row">
                                     <span class="avgs-control-label">Outliers:</span>
-                                    <div class="avgs-radio-group">
+                                    <div class="avgs-radio-group avgs-filter-controls">
                                         <label class="avgs-radio-label">
                                             <input type="radio" name="trimRule" value="0"> 0 (mean)
                                         </label>
@@ -6206,7 +6394,7 @@
 
                                 <div class="avgs-filter-row">
                                     <span class="avgs-control-label">PB type:</span>
-                                    <div class="avgs-radio-group">
+                                    <div class="avgs-radio-group avgs-filter-controls">
                                         <label class="avgs-radio-label">
                                             <input type="radio" name="category" value="time" checked> Time
                                         </label>
@@ -6221,7 +6409,7 @@
 
                                 <div class="avgs-filter-row">
                                     <span class="avgs-control-label">Avgs:</span>
-                                    <div class="avgs-radio-group">
+                                    <div class="avgs-radio-group avgs-filter-controls">
                                         <label class="avgs-radio-label">
                                             <input type="radio" name="avgSet" value="all"> All
                                         </label>
@@ -6236,25 +6424,39 @@
 
                                 <div class="avgs-filter-row">
                                     <span class="avgs-control-label">ID range:</span>
-                                    <input type="number" id="avgs-start-id" class="avgs-filter-input" placeholder="Start ID" min="1">
-                                    <span class="avgs-range-separator">-</span>
-                                    <input type="number" id="avgs-end-id" class="avgs-filter-input" placeholder="End ID" min="1">
+                                    <div class="avgs-filter-controls">
+                                        <input type="number" id="avgs-start-id" class="avgs-filter-input" placeholder="Start ID" min="1">
+                                        <span class="avgs-range-separator">-</span>
+                                        <input type="number" id="avgs-end-id" class="avgs-filter-input" placeholder="End ID" min="1">
+                                    </div>
                                 </div>
 
                                 <div class="avgs-filter-row">
-                                    <label class="avgs-checkbox-label">
-                                        <input type="checkbox" id="avgs-use-date-range">
-                                        <span class="avgs-control-label date-filter-high">Date filter:</span>
-                                    </label>
-                                    <div class="avgs-date-range" id="avgs-date-range-inputs" style="display:none;">
-                                        <input type="date" id="avgs-start-date" class="avgs-date-input" value="${todayStr}">
-                                        <span class="avgs-range-separator">to</span>
-                                        <div class="avgs-end-date-row">
-                                            <input type="date" id="avgs-end-date" class="avgs-date-input" value="${todayStr}" style="display:none;">
-                                            <label class="avgs-checkbox-label">
-                                                <input type="checkbox" id="avgs-no-end-date" checked>
-                                                <span class="avgs-control-label date-filter-high">Today</span>
-                                            </label>
+                                    <span class="avgs-control-label">Sub-session:</span>
+                                    <div class="avgs-filter-controls">
+                                        <select id="avgs-session-select" class="avgs-session-select">
+                                            <option value="all">All sub-sessions</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="avgs-filter-row">
+                                    <span class="avgs-control-label">Date:</span>
+                                    <div class="avgs-filter-controls">
+                                        <label class="avgs-checkbox-label">
+                                            <input type="checkbox" id="avgs-use-date-range">
+                                            <span class="date-filter-high">Use range</span>
+                                        </label>
+                                        <div class="avgs-date-range" id="avgs-date-range-inputs" style="display:none;">
+                                            <input type="date" id="avgs-start-date" class="avgs-date-input" value="${todayStr}">
+                                            <span class="avgs-range-separator">to</span>
+                                            <div class="avgs-end-date-row">
+                                                <input type="date" id="avgs-end-date" class="avgs-date-input" value="${todayStr}" style="display:none;">
+                                                <label class="avgs-checkbox-label">
+                                                    <input type="checkbox" id="avgs-no-end-date" checked>
+                                                    <span class="date-filter-high">Today</span>
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -6319,6 +6521,7 @@
             const killBtn = container.querySelector('.avgs-kill-btn');
             const resetBtn = container.querySelector('.avgs-reset-btn');
             const filterInputs = container.querySelectorAll('#avgs-start-id, #avgs-end-id');
+            const sessionSelect = container.querySelector('#avgs-session-select');
             const useDateRangeCheck = container.querySelector('#avgs-use-date-range');
             const dateRangeDiv = container.querySelector('#avgs-date-range-inputs');
             const noEndDateCheck = container.querySelector('#avgs-no-end-date');
@@ -6350,6 +6553,8 @@
                 input.addEventListener('input', calculateAvgs);
             });
 
+            sessionSelect.addEventListener('change', calculateAvgs);
+
             useDateRangeCheck.addEventListener('change', () => {
                 dateRangeDiv.style.display = useDateRangeCheck.checked ? 'flex' : 'none';
                 calculateAvgs();
@@ -6375,23 +6580,28 @@
                         const yesterdayStr = yesterday.toISOString().split('T')[0];
                         startDateInput.value = yesterdayStr;
                         endDateInput.value = yesterdayStr;
+                        noEndDateCheck.checked = false;
                     } else if (preset === 'today') {
                         startDateInput.value = todayStr;
                         endDateInput.value = todayStr;
+                        noEndDateCheck.checked = true;
                     } else if (preset === 'last7') {
                         const startDate = new Date(today);
                         startDate.setDate(today.getDate() - 6);
                         startDateInput.value = startDate.toISOString().split('T')[0];
                         endDateInput.value = todayStr;
+                        noEndDateCheck.checked = true;
                     } else if (preset === 'last30') {
                         const startDate = new Date(today);
                         startDate.setDate(today.getDate() - 29);
                         startDateInput.value = startDate.toISOString().split('T')[0];
                         endDateInput.value = todayStr;
+                        noEndDateCheck.checked = true;
                     }
 
                     useDateRangeCheck.checked = true;
                     dateRangeDiv.style.display = 'flex';
+                    endDateInput.style.display = noEndDateCheck.checked ? 'none' : 'inline-block';
                     calculateAvgs();
                 });
             });
@@ -6415,6 +6625,7 @@
             progressText = container.querySelector('.avgs-progress-text');
 
             endDateInput.style.display = noEndDateCheck.checked ? 'none' : 'inline-block';
+            updateSessionFilterOptions();
         }
 
         function handleCalculateOrClick() {
