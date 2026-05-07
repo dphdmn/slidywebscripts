@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.49.0
+// @version      3.50.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4594,6 +4594,7 @@
         // Chart variables
         let chart1 = null;
         let chart2 = null;
+        let currentGraphDataType = 'single';
 
         // ==================== REPLAY FUNCTIONS ====================
         function parseDetailTime(timeStr) {
@@ -6079,6 +6080,7 @@
             }
 
             if (graphsEnabled) {
+                currentGraphDataType = type;
                 updateGraphs(type);
             }
 
@@ -6752,8 +6754,9 @@
             return '';
         }
 
-        function updateGraphs(dataType) {
+        function updateGraphs(dataType = currentGraphDataType) {
             if (!graphsEnabled) return;
+            currentGraphDataType = dataType || 'single';
 
             if (typeof ChartDataLabels !== 'undefined') {
                 Chart.register(ChartDataLabels);
@@ -6766,6 +6769,7 @@
 
             const graphsContainer = document.querySelector('#avgs-graphs-container');
             if (!graphsContainer) return;
+            destroyCharts();
 
             if (filteredSolves.length === 0) {
                 graphsContainer.innerHTML = `
@@ -6774,18 +6778,17 @@
                         <div class="avgs-no-data-message">No data available with current filters</div>
                     </div>
                 `;
-                destroyCharts();
                 return;
             }
 
             const validSolves = filteredSolves.filter(s => !s.isDNF);
             const tooManySolves = validSolves.length > 500;
 
-            const shouldShowHistogram = dataType === "single" || dataType === "marathon";
+            const dataTypeSupportsHistogram = currentGraphDataType === "single" || currentGraphDataType === "marathon";
+            const shouldShowHistogram = dataTypeSupportsHistogram || tooManySolves;
 
             let values;
             if (category === 'time') {
-                4
                 values = validSolves.map(s => s.time);
             } else if (category === 'moves') {
                 values = validSolves.map(s => s.moves);
@@ -6842,7 +6845,6 @@
             }
 
             if (validSolves.length === 0) {
-                destroyCharts();
                 if (shouldShowHistogram) {
                     const ctx2 = document.getElementById('histogramChart')?.getContext('2d');
                     if (ctx2) {
@@ -6864,9 +6866,7 @@
                 return;
             }
 
-            destroyCharts();
-
-            const shouldCreateChronological = !shouldShowHistogram || !tooManySolves;
+            const shouldCreateChronological = !tooManySolves;
             if (shouldCreateChronological) {
                 const chronologicalData = [];
 
