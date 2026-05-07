@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.51.0
+// @version      3.52.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -117,12 +117,23 @@
             white-space: nowrap;     
         }
 
+        .live-table th.live-group-start,
+        .live-table td.live-group-start {
+            border-left: 3px solid rgba(255,255,255,0.75);
+        }
+
         .live-table thead th {
             background: #2a2a2a;
             color: #aaa;
             font-weight: normal;
             font-size: 11px;
             border-bottom: 2px solid #444;
+        }
+
+        .live-table thead tr:first-child th {
+            color: #ddd;
+            font-size: 12px;
+            font-weight: bold;
         }
 
         .live-table tbody tr:hover td {
@@ -7781,8 +7792,26 @@
         const colgroup = document.createElement('colgroup');
 
         const ONECELL = 60;
-        const CELLNUMBER = 20;
         const rowKeys = BEST_KEYS;
+        const averageKeys = rowKeys.filter(k => k !== 1);
+        const metricGroups = [
+            { key: 'time', label: 'Time averages' },
+            { key: 'moves', label: 'Moves averages' },
+            { key: 'tps', label: 'TPS averages' }
+        ];
+        const totalColumns = 2 + 3 + (averageKeys.length * metricGroups.length);
+        const GROUP_BORDER_WIDTH = 3;
+        const groupStartColumns = [
+            2,
+            2 + 3,
+            2 + 3 + averageKeys.length,
+            2 + 3 + (averageKeys.length * 2)
+        ];
+        const groupColumnEdges = [
+            2 + 3,
+            2 + 3 + averageKeys.length,
+            2 + 3 + (averageKeys.length * 2)
+        ];
         const timeColWidth = ONECELL;
         const statColWidth = ONECELL;
 
@@ -7794,13 +7823,11 @@
         colNum.style.width = statColWidth + 'px';
         colgroup.appendChild(colNum);
 
-        rowKeys.forEach(() => {
-            for (let s = 0; s < 3; s++) {
-                const col = document.createElement('col');
-                col.style.width = statColWidth + 'px';
-                colgroup.appendChild(col);
-            }
-        });
+        for (let i = 2; i < totalColumns; i++) {
+            const col = document.createElement('col');
+            col.style.width = statColWidth + 'px';
+            colgroup.appendChild(col);
+        }
 
         table.appendChild(colgroup);
         table.appendChild(thead);
@@ -7810,37 +7837,57 @@
         container.appendChild(tableWrapper);
 
         function buildHeader() {
-            let headerRow = document.createElement('tr');
-            const thTime = document.createElement('th');
-            thTime.textContent = 'HH:MM';
-            const thNum = document.createElement('th');
-            thNum.id = 'solveCountHeader';
-            thNum.textContent = liveSolvesData.length;
-            headerRow.appendChild(thTime);
-            headerRow.appendChild(thNum);
-            const labels = [
-                { full: 'Time', short: 'T' },
-                { full: 'Moves', short: 'M' },
-                { full: 'TPS', short: 'S' }
-            ];
+            const groupRow = document.createElement('tr');
+            const labelRow = document.createElement('tr');
 
-            rowKeys.forEach(k => {
-                labels.forEach(({ full, short }) => {
-                    const th = document.createElement('th');
-                    th.textContent = k === 1 ? full : `${short} ao${k}`;
-                    headerRow.appendChild(th);
+            const addGroupHeader = (label, span, className = '') => {
+                const th = document.createElement('th');
+                th.textContent = label;
+                th.colSpan = span;
+                if (className) th.classList.add(...className.split(' '));
+                groupRow.appendChild(th);
+            };
+
+            const addColumnHeader = (label, className = '') => {
+                const th = document.createElement('th');
+                th.textContent = label;
+                if (className) th.classList.add(...className.split(' '));
+                labelRow.appendChild(th);
+                return th;
+            };
+
+            addGroupHeader('Solve #', 2);
+            addColumnHeader('HH:MM');
+            const thNum = addColumnHeader(liveSolvesData.length);
+            thNum.id = 'solveCountHeader';
+
+            addGroupHeader('Single', 3, 'live-group-start');
+            ['Time', 'Moves', 'TPS'].forEach((label, index) => {
+                addColumnHeader(label, index === 0 ? 'live-group-start' : '');
+            });
+
+            metricGroups.forEach(({ key, label }) => {
+                addGroupHeader(label, averageKeys.length, 'live-group-start');
+                averageKeys.forEach((k, index) => {
+                    addColumnHeader(`ao${k}`, index === 0 ? `live-group-start live-${key}-group` : '');
                 });
             });
             thead.innerHTML = '';
-            thead.appendChild(headerRow);
+            thead.appendChild(groupRow);
+            thead.appendChild(labelRow);
         }
         buildHeader();
 
-        const totalTableWidth = ONECELL * (CELLNUMBER + 1); //safety margin 
+        const totalTableWidth = ONECELL * (totalColumns + 1); //safety margin
         table.style.width = totalTableWidth + 'px';
         //table.style.minWidth = totalTableWidth + 'px';
 
-        const initialVisibleWidth = 5 * ONECELL + 10;
+        const snapOffset = 30;
+        const snapTargets = groupColumnEdges.map(cols => {
+            const visibleGroupBorders = groupStartColumns.filter(startCol => startCol <= cols).length;
+            return (cols * ONECELL) + snapOffset + (visibleGroupBorders * GROUP_BORDER_WIDTH);
+        });
+        const initialVisibleWidth = (2 + 3) * ONECELL + 10;
         container.style.width = initialVisibleWidth + 20 + 'px';
         container.style.maxHeight = '100vh';
 
@@ -7856,16 +7903,16 @@
         function onMouseMove(e) {
             const dx = startX - e.clientX;
             let newWidth = startWidth + dx;
-            newWidth = Math.max(10, Math.min(ONECELL * (CELLNUMBER + 1), newWidth));  //safety margin 
+            newWidth = Math.max(10, Math.min(ONECELL * (totalColumns + 1), newWidth));  //safety margin
             let containerW = newWidth;
             if (containerW > 10) {
                 containerW = containerW + 20;
             }
 
-            // Snap to 330px when within 15px range
-            const snapTarget = 330;
+            // Snap to group edges when within 15px range
             const snapRange = 15;
-            if (Math.abs(containerW - snapTarget) <= snapRange) {
+            const snapTarget = snapTargets.find(target => Math.abs(containerW - target) <= snapRange);
+            if (snapTarget !== undefined) {
                 containerW = snapTarget;
             }
 
@@ -7899,7 +7946,7 @@
         };
     }
 
-    function createSolveRow(solve, rowKeys, totalSolves, isNewest) {
+    function createInterleavedSolveRow(solve, rowKeys, totalSolves, isNewest) {
         const tr = document.createElement('tr');
         const d = new Date(solve.timestamp);
         const timeStr = d.getHours().toString().padStart(2, '0') + ':' +
@@ -7949,12 +7996,80 @@
         return tr;
     }
 
+    function createOrderedSolveRow(solve, rowKeys, totalSolves, isNewest) {
+        const tr = document.createElement('tr');
+        const d = new Date(solve.timestamp);
+        const timeStr = d.getHours().toString().padStart(2, '0') + ':' +
+            d.getMinutes().toString().padStart(2, '0');
+
+        const tdTime = document.createElement('td');
+        tdTime.textContent = timeStr;
+        tr.appendChild(tdTime);
+
+        const tdNum = document.createElement('td');
+        tdNum.textContent = solve.solveCounter;
+        tr.appendChild(tdNum);
+
+        const appendStatCell = (value, isPb, isUnavailable, className) => {
+            const td = document.createElement('td');
+            if (className) td.classList.add(className);
+
+            let content = value;
+            if (content === null || content === undefined || content === 'DNF' || content === '—') {
+                content = '—';
+            } else if (typeof content === 'number') {
+                content = Number.isInteger(content) ? content.toString() : content.toFixed(3);
+            }
+            td.textContent = content;
+
+            if (isUnavailable) {
+                td.style.color = 'gray';
+            } else if (isPb) {
+                td.classList.add('pb-cell');
+            }
+            tr.appendChild(td);
+        };
+
+        const appendMetricForKey = (k, metric, className = '') => {
+            const data = solve[k];
+            if (!data) {
+                appendStatCell('—', false, false, className);
+                return;
+            }
+
+            appendStatCell(
+                metric.value(data),
+                metric.pb(data),
+                isNewest && k > totalSolves,
+                className
+            );
+        };
+
+        const metrics = [
+            { value: data => data.timeText, pb: data => data.pbtime },
+            { value: data => data.movesNum, pb: data => data.pbmoves },
+            { value: data => data.tpsNum === Infinity ? '∞' : data.tpsNum, pb: data => data.pbtps }
+        ];
+        const averageKeys = rowKeys.filter(k => k !== 1);
+
+        metrics.forEach((metric, index) => {
+            appendMetricForKey(1, metric, index === 0 ? 'live-group-start' : '');
+        });
+        metrics.forEach(metric => {
+            averageKeys.forEach((k, index) => {
+                appendMetricForKey(k, metric, index === 0 ? 'live-group-start' : '');
+            });
+        });
+
+        return tr;
+    }
+
     function updateLiveStatsTable(tbody, rowKeys) {
         if (tbody.firstChild) return; // Already populated, use append instead
 
         const fragment = document.createDocumentFragment();
         for (let i = liveSolvesData.length - 1; i >= 0; i--) {
-            fragment.appendChild(createSolveRow(liveSolvesData[i], rowKeys, liveSolvesData.length, false));
+            fragment.appendChild(createOrderedSolveRow(liveSolvesData[i], rowKeys, liveSolvesData.length, false));
         }
         tbody.appendChild(fragment);
         const headerEl = document.getElementById('solveCountHeader');
@@ -7963,7 +8078,7 @@
 
     function appendSolveRow(tbody, solve, rowKeys) {
         const totalSolves = liveSolvesData.length;
-        tbody.insertBefore(createSolveRow(solve, rowKeys, totalSolves, true), tbody.firstChild);
+        tbody.insertBefore(createOrderedSolveRow(solve, rowKeys, totalSolves, true), tbody.firstChild);
     }
 
     let liveStats;
