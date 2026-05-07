@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.50.1
+// @version      3.51.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1442,7 +1442,6 @@
     let dragHandle = null;
     let scrambled = false;
     let positionApplied = false;
-    let isCornerMode = true;
     let isZenMode = false;
 
     const DEFAULT_CONFIG = {
@@ -2345,7 +2344,7 @@
         defaultValue: DEFAULT_CONFIG.puzzleLeft,
         storageKey: STORAGE_KEYS.puzzleLeft,
         unit: 'px',
-        min: '0',
+        min: '-1900',
         max: '1900',
         step: '1',
         onChange: (val) => applyPuzzlePosition()
@@ -2359,7 +2358,7 @@
         defaultValue: DEFAULT_CONFIG.puzzleTop,
         storageKey: STORAGE_KEYS.puzzleTop,
         unit: 'px',
-        min: '0',
+        min: '-1000',
         max: '1000',
         step: '1',
         onChange: (val) => applyPuzzlePosition()
@@ -2965,7 +2964,11 @@
         type: 'checkbox',
         defaultValue: DEFAULT_CONFIG.puzzleAlwaysInCenter,
         storageKey: STORAGE_KEYS.puzzleAlwaysInCenter,
-        onChange: (val) => { }
+        onChange: (val) => {
+            if (val) {
+                toggleCenterPosition();
+            }
+        }
     });
     settings.puzzleAlwaysInCenter = puzzleAlwaysInCenterSetting;
 
@@ -3157,31 +3160,63 @@
     }
 
     function centerPuzzle() {
-        const puzzleContainer = document.querySelector('.puzzle-container');
-        if (!puzzleContainer) return;
-        
-        const containerRect = puzzleContainer.getBoundingClientRect();
-        const containerWidth = containerRect.width;
-        const containerHeight = containerRect.height;
-        
-        const liveStatsContainer = document.querySelector('.live-stats-container');
-        const statsWidth = liveStatsContainer ? liveStatsContainer.offsetWidth : 0;
-        
-        const pendingLeft = (window.innerWidth - containerWidth) / 2 - statsWidth / 2;
-        const pendingTop = (window.innerHeight - containerHeight - 30) / 2;
-        
-        puzzleContainer.style.left = pendingLeft + 'px';
-        puzzleContainer.style.top = pendingTop + 'px';
-        settings.puzzleLeft.setValue(pendingLeft);
-        settings.puzzleTop.setValue(pendingTop);
+        settings.puzzleLeft.setValue(0);
+        settings.puzzleTop.setValue(0);
+    }
+
+    function getActivePuzzleContainer() {
+        return puzzleContainer && puzzleContainer.isConnected
+            ? puzzleContainer
+            : document.querySelector('.puzzle-container');
+    }
+
+    function getCurrentPuzzleOffset(puzzle) {
+        const styles = getComputedStyle(puzzle);
+        const left = parseFloat(styles.left);
+        const top = parseFloat(styles.top);
+
+        return {
+            left: isNaN(left) ? currentConfig.puzzleLeft : left,
+            top: isNaN(top) ? currentConfig.puzzleTop : top
+        };
+    }
+
+    function getPuzzleTopLeftOffset() {
+        const focusArea = document.querySelector('.focus-area');
+        const puzzle = getActivePuzzleContainer();
+        if (!focusArea || !puzzle) {
+            return { left: 0, top: 0 };
+        }
+
+        const focusRect = focusArea.getBoundingClientRect();
+        const puzzleRect = puzzle.getBoundingClientRect();
+        const currentOffset = getCurrentPuzzleOffset(puzzle);
+
+        return {
+            left: Math.ceil(currentOffset.left + focusRect.left - puzzleRect.left),
+            top: Math.ceil(currentOffset.top + focusRect.top - puzzleRect.top)
+        };
+    }
+
+    function movePuzzleToTopLeft() {
+        const focusContainer = document.querySelector('.focus-area');
+        if (!focusContainer) return;
+
+        const candidateOffset = getPuzzleTopLeftOffset();
+        const topLeftOffset = clampPuzzlePosition(candidateOffset.left, candidateOffset.top);
+        settings.puzzleLeft.setValue(topLeftOffset.left, { store: true, notify: false });
+        settings.puzzleTop.setValue(topLeftOffset.top, { store: true, notify: false });
+        focusContainer.setAttribute('puzzle-position', 'center');
+        applyPuzzlePosition();
     }
 
     function enterEditMode() {
         const puzzleContainer = document.querySelector('.puzzle-container');
-        const wasCentered = !isCornerMode;
         if (!puzzleContainer) return;
         const focusArea = document.querySelector('.focus-area');
-        isCornerMode = true;
+        if (focusArea) {
+            focusArea.setAttribute('puzzle-position', 'center');
+        }
         setTimeout(() => {
             if (focusArea) {
                 focusArea.focus();
@@ -3201,10 +3236,6 @@
         isEditingMode = true;
         adjustButton.textContent = '✅ Done';
 
-        if (wasCentered) {
-            centerPuzzle();
-        }
-        
     }
 
     function exitEditMode() {
@@ -3249,15 +3280,27 @@
     let pendingLeft = null, pendingTop = null;
     let updateScheduled = false;
 
+    function clampPuzzlePosition(left, top) {
+        const { left: minLeft, top: minTop } = getPuzzleTopLeftOffset();
+
+        return {
+            left: Math.max(minLeft, left),
+            top: Math.max(minTop, top)
+        };
+    }
+
     function scheduleUpdate() {
         if (updateScheduled) return;
         updateScheduled = true;
         requestAnimationFrame(() => {
             if (pendingLeft !== null && pendingTop !== null && puzzleContainer) {
-                puzzleContainer.style.left = pendingLeft + 'px';
-                puzzleContainer.style.top = pendingTop + 'px';
-                settings.puzzleLeft.setValue(pendingLeft);
-                settings.puzzleTop.setValue(pendingTop);
+                const clampedPosition = clampPuzzlePosition(pendingLeft, pendingTop);
+                puzzleContainer.style.left = clampedPosition.left + 'px';
+                puzzleContainer.style.top = clampedPosition.top + 'px';
+                settings.puzzleLeft.setValue(clampedPosition.left, { store: true, notify: false });
+                settings.puzzleTop.setValue(clampedPosition.top, { store: true, notify: false });
+                root.style.setProperty('--puzzle-left', `${clampedPosition.left}px`);
+                root.style.setProperty('--puzzle-top', `${clampedPosition.top}px`);
             }
             updateScheduled = false;
         });
@@ -3274,8 +3317,9 @@
         let newLeft = Math.round(startLeft + deltaX);
         let newTop = Math.round(startTop + deltaY);
 
-        newLeft = Math.min(1900, Math.max(0, newLeft));
-        newTop = Math.min(1000, Math.max(0, newTop));
+        const clampedPosition = clampPuzzlePosition(newLeft, newTop);
+        newLeft = clampedPosition.left;
+        newTop = clampedPosition.top;
 
         pendingLeft = newLeft;
         pendingTop = newTop;
@@ -3352,7 +3396,6 @@
     }
 
     function toggleCenterPosition() {
-        isCornerMode = false;
         if (isEditingMode) {
             exitEditMode();
         }
@@ -3573,11 +3616,19 @@
             positionApplied = false;
             return;
         }
-        if (isCornerMode) {
-            focusContainer.setAttribute('puzzle-position', 'corner');
+        focusContainer.setAttribute('puzzle-position', 'center');
+
+        const clampedPosition = clampPuzzlePosition(currentConfig.puzzleLeft, currentConfig.puzzleTop);
+        if (clampedPosition.left !== currentConfig.puzzleLeft) {
+            settings.puzzleLeft.setValue(clampedPosition.left, { store: true, notify: false });
         }
-        root.style.setProperty('--puzzle-left', `${currentConfig.puzzleLeft}px`);
-        root.style.setProperty('--puzzle-top', `${currentConfig.puzzleTop}px`);
+        if (clampedPosition.top !== currentConfig.puzzleTop) {
+            settings.puzzleTop.setValue(clampedPosition.top, { store: true, notify: false });
+        }
+
+        root.style.setProperty('--puzzle-left', `${clampedPosition.left}px`);
+        root.style.setProperty('--puzzle-top', `${clampedPosition.top}px`);
+        positionApplied = true;
     }
 
     function applyBorder(width, color) {
@@ -4215,6 +4266,12 @@
 
     const BASE = 75;
 
+    function checkPuzzleBoundariesAfterZoom() {
+        requestAnimationFrame(() => {
+            applyPuzzlePosition();
+        });
+    }
+
     function setMaxSize() {
         const focus = document.querySelector('.focus-container');
         const puzzle = document.querySelector('.puzzle-container');
@@ -4230,11 +4287,13 @@
         const finalZ = Math.max(1, maxZ);
 
         puzzle.style.setProperty('--zoom-factor', (finalZ / BASE));
+        checkPuzzleBoundariesAfterZoom();
     }
     function setDefaultSize() {
         const el = document.querySelector('.puzzle-container');
         if (!el) return;
         el.style.setProperty('--zoom-factor', (1).toString());
+        checkPuzzleBoundariesAfterZoom();
     }
     function isZoomDefault() {
         const el = document.querySelector('.puzzle-container');
@@ -4256,6 +4315,7 @@
         if (z < 1) z = 1;
 
         el.style.setProperty('--zoom-factor', (z / BASE));
+        checkPuzzleBoundariesAfterZoom();
     }
 
     document.addEventListener('fullscreenchange', () => {
@@ -4480,9 +4540,14 @@
             }
         }
         initSound();
-        applyPuzzlePosition();
-        if (!positionApplied && currentConfig.puzzleAlwaysInCenter) {
-            toggleCenterPosition();
+        if (!positionApplied) {
+            if (currentConfig.puzzleAlwaysInCenter) {
+                toggleCenterPosition();
+            } else {
+                movePuzzleToTopLeft();
+            }
+        } else {
+            applyPuzzlePosition();
         }
 
         replaceText();
