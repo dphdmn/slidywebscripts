@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.53.0
+// @version      3.54.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -5618,6 +5618,7 @@
             const startId = parseInt(document.querySelector('#avgs-start-id')?.value) || null;
             const endId = parseInt(document.querySelector('#avgs-end-id')?.value) || null;
             const selectedSession = document.querySelector('#avgs-session-select')?.value || 'all';
+            const sinceLastDnf = document.querySelector('#avgs-since-last-dnf')?.checked || false;
 
             let filtered = solves;
 
@@ -5662,6 +5663,13 @@
                     if (endDate && solve.date > endDate) return false;
                     return true;
                 });
+            }
+
+            if (sinceLastDnf) {
+                const lastDnfIndex = filtered.map(solve => solve.isDNF).lastIndexOf(true);
+                if (lastDnfIndex !== -1) {
+                    filtered = filtered.slice(lastDnfIndex + 1);
+                }
             }
 
             return filtered;
@@ -5811,6 +5819,7 @@
             const selectedSessionText = sessionSelect?.value && sessionSelect.value !== 'all'
                 ? sessionSelect.options[sessionSelect.selectedIndex]?.textContent
                 : '';
+            const sinceLastDnf = document.querySelector('#avgs-since-last-dnf')?.checked || false;
 
             const useDateRange = document.querySelector('#avgs-use-date-range')?.checked || false;
 
@@ -5818,6 +5827,10 @@
 
             if (selectedSessionText) {
                 filterText += `, ${selectedSessionText}`;
+            }
+
+            if (sinceLastDnf) {
+                filterText += `, since last DNF`;
             }
 
             if (startId || endId) {
@@ -6518,6 +6531,10 @@
                                         <select id="avgs-session-select" class="avgs-session-select">
                                             <option value="all">All sub-sessions</option>
                                         </select>
+                                        <label class="avgs-checkbox-label">
+                                            <input type="checkbox" id="avgs-since-last-dnf">
+                                            <span class="date-filter-high">Since last DNF</span>
+                                        </label>
                                     </div>
                                 </div>
 
@@ -6545,7 +6562,6 @@
                                 <div class="avgs-filter-row">
                                     <div class="avgs-quick-dates">
                                         <button class="avgs-quick-date-btn" data-preset="today">Today</button>
-                                        <button class="avgs-quick-date-btn" data-preset="yesterday">Yesterday</button>
                                         <button class="avgs-quick-date-btn" data-preset="last7">Last 7 days</button>
                                         <button class="avgs-quick-date-btn" data-preset="last30">Last 30 days</button>
                                     </div>
@@ -6603,6 +6619,7 @@
             const resetBtn = container.querySelector('.avgs-reset-btn');
             const filterInputs = container.querySelectorAll('#avgs-start-id, #avgs-end-id');
             const sessionSelect = container.querySelector('#avgs-session-select');
+            const sinceLastDnfCheck = container.querySelector('#avgs-since-last-dnf');
             const useDateRangeCheck = container.querySelector('#avgs-use-date-range');
             const dateRangeDiv = container.querySelector('#avgs-date-range-inputs');
             const noEndDateCheck = container.querySelector('#avgs-no-end-date');
@@ -6635,6 +6652,7 @@
             });
 
             sessionSelect.addEventListener('change', calculateAvgs);
+            sinceLastDnfCheck.addEventListener('change', calculateAvgs);
 
             useDateRangeCheck.addEventListener('change', () => {
                 dateRangeDiv.style.display = useDateRangeCheck.checked ? 'flex' : 'none';
@@ -6655,14 +6673,7 @@
                     const today = new Date();
                     const todayStr = today.toISOString().split('T')[0];
 
-                    if (preset === 'yesterday') {
-                        const yesterday = new Date(today);
-                        yesterday.setDate(today.getDate() - 1);
-                        const yesterdayStr = yesterday.toISOString().split('T')[0];
-                        startDateInput.value = yesterdayStr;
-                        endDateInput.value = yesterdayStr;
-                        noEndDateCheck.checked = false;
-                    } else if (preset === 'today') {
+                    if (preset === 'today') {
                         startDateInput.value = todayStr;
                         endDateInput.value = todayStr;
                         noEndDateCheck.checked = true;
