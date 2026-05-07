@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.47.0
+// @version      3.48.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -649,6 +649,10 @@
             object-fit: contain;
             background: #111;
             border: 1px solid #222;
+        }
+        .cursor-preview-thumb.default-cursor-thumb {
+            padding: 6px;
+            box-sizing: border-box;
         }
         .cursor-preview-label {
             flex: 1;
@@ -1703,12 +1707,14 @@
     const CURSOR_DB_NAME = 'SlidySimCursor';
     const CURSOR_STORE_NAME = 'cursors';
     const CURSOR_KEY = 'custom_cursor';
+    const DEFAULT_CURSOR_ID = 'default_cursor';
+    const DEFAULT_CURSOR_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAATCAYAAACk9eypAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADmSURBVDhPjY/NDsFAFIXv9ZOQRlVIiLew8hRe0UvoEovuJDYiwVYsNFYVFUSCOdMrmUpb861ub883Z4aI3SNVukOyRgnM3sxeUsJbYS+JAOwkQwD/pR8BFEsZAsiXcgSQLRUI98czQyoQQBRdfqQ/AgjDkyFZCGC/P2iJtfA695I6ouv1To5T03Op1JrrIYXREMe3N1EjnvhT/a1OnJbL7ZEkBRG+YdyT2V1jl1zDXUtSUIIZ1iv2/CBYwEGLn2rRrzfCGszc3ELYbHZoWcmffHAywtKylHUB9XYfLcytMVU7g2RJ9AEDZkogKtgbQgAAAABJRU5ErkJggg==";
     let db = null;
     let cursorDb = null;
     let currentBlobUrl = null;
     let currentCursorBlobUrl = null;
     const cursorEntries = [];
-    let selectedCursorId = null;
+    let selectedCursorId = DEFAULT_CURSOR_ID;
 
     async function restoreMedia() {
         try {
@@ -1732,18 +1738,25 @@
                 ensureCursorMetadata(entry);
             });
 
-            selectedCursorId = currentConfig.selectedCursorId && cursorEntries.some(entry => entry.id === currentConfig.selectedCursorId)
-                ? currentConfig.selectedCursorId
-                : (cursorEntries.length ? cursorEntries[0].id : null);
+            const legacyCursorDisabled = currentConfig.cursorEnabled === false;
+            const storedCursorExists = currentConfig.selectedCursorId
+                && getCursorEntriesForPicker().some(entry => entry.id === currentConfig.selectedCursorId);
+            selectedCursorId = legacyCursorDisabled
+                ? DEFAULT_CURSOR_ID
+                : (storedCursorExists ? currentConfig.selectedCursorId : DEFAULT_CURSOR_ID);
+            if (legacyCursorDisabled) {
+                localStorage.setItem(STORAGE_KEYS.selectedCursorId, DEFAULT_CURSOR_ID);
+            }
+            localStorage.removeItem(STORAGE_KEYS.cursorEnabled);
+            currentConfig.cursorEnabled = true;
 
-            if (selectedCursorId) {
-                const selectedEntry = cursorEntries.find(entry => entry.id === selectedCursorId);
-                if (selectedEntry) {
-                    currentCursorBlobUrl = createCursorObjectURL(selectedEntry);
-                    if (currentConfig.cursorEnabled) {
-                        toggleCustomCursor(true);
-                    }
-                }
+            const selectedEntry = getSelectedCursorEntry();
+            if (selectedEntry?.isDefault) {
+                currentCursorBlobUrl = null;
+                toggleCustomCursor(false);
+            } else if (selectedEntry) {
+                currentCursorBlobUrl = createCursorObjectURL(selectedEntry);
+                toggleCustomCursor(true);
             }
 
             renderCursorPicker();
@@ -1822,7 +1835,20 @@
         });
     }
 
+    function getDefaultCursorEntry() {
+        return {
+            id: DEFAULT_CURSOR_ID,
+            name: 'Default cursor',
+            isDefault: true
+        };
+    }
+
+    function getCursorEntriesForPicker() {
+        return [getDefaultCursorEntry(), ...cursorEntries];
+    }
+
     function createCursorObjectURL(entry) {
+        if (entry?.isDefault) return null;
         if (entry.url) return entry.url;
         if (entry.blob) {
             entry.url = URL.createObjectURL(entry.blob);
@@ -1868,12 +1894,11 @@
     }
 
     function getSelectedCursorEntry() {
-        return cursorEntries.find(entry => entry.id === selectedCursorId) || null;
+        return getCursorEntriesForPicker().find(entry => entry.id === selectedCursorId) || getDefaultCursorEntry();
     }
 
     function updateCursorControlsVisibility() {
-        const hasEntries = cursorEntries.length > 0;
-        cursorPreviewBadge.style.display = hasEntries ? 'inline-flex' : 'none';
+        cursorPreviewBadge.style.display = 'inline-flex';
     }
 
     function setSelectedCursorId(id, options = { store: true, notify: true }) {
@@ -1882,16 +1907,16 @@
             localStorage.setItem(STORAGE_KEYS.selectedCursorId, String(id));
         }
         renderCursorPicker();
-        if (options.notify && currentConfig.cursorEnabled) {
+        if (options.notify) {
             const selected = getSelectedCursorEntry();
-            if (selected) {
-                currentCursorBlobUrl = createCursorObjectURL(selected);
-                applyCustomCursor(currentCursorBlobUrl);
-            }
+            currentCursorBlobUrl = selected?.isDefault ? null : createCursorObjectURL(selected);
+            toggleCustomCursor(!selected?.isDefault);
         }
     }
 
     async function removeCursorEntry(id) {
+        if (id === DEFAULT_CURSOR_ID) return;
+
         const index = cursorEntries.findIndex(entry => entry.id === id);
         if (index === -1) return;
 
@@ -1900,18 +1925,10 @@
         await deleteCursorEntryFromDB(id);
 
         if (selectedCursorId === id) {
-            selectedCursorId = cursorEntries.length ? cursorEntries[0].id : null;
-            if (selectedCursorId) {
-                localStorage.setItem(STORAGE_KEYS.selectedCursorId, selectedCursorId);
-                if (currentConfig.cursorEnabled) {
-                    const target = getSelectedCursorEntry();
-                    currentCursorBlobUrl = createCursorObjectURL(target);
-                    applyCustomCursor(currentCursorBlobUrl);
-                }
-            } else {
-                localStorage.removeItem(STORAGE_KEYS.selectedCursorId);
-                toggleCustomCursor(false);
-            }
+            selectedCursorId = DEFAULT_CURSOR_ID;
+            localStorage.setItem(STORAGE_KEYS.selectedCursorId, selectedCursorId);
+            currentCursorBlobUrl = null;
+            toggleCustomCursor(false);
         }
 
         renderCursorPicker();
@@ -1920,22 +1937,14 @@
     function renderCursorPicker() {
         cursorListContainer.innerHTML = '';
         const selected = getSelectedCursorEntry();
+        const pickerEntries = getCursorEntriesForPicker();
         updateCursorControlsVisibility();
 
-        if (!cursorEntries.length) {
-            const empty = document.createElement('div');
-            empty.className = 'cursor-preview-empty';
-            empty.textContent = 'No cursors uploaded yet';
-            cursorListContainer.appendChild(empty);
-            cursorPreviewImg.src = '';
-            cursorPreviewImg.alt = 'No cursor';
-            cursorPreviewBadge.style.cursor = 'auto';
-            return;
-        }
-
-        cursorPreviewImg.src = selected ? createCursorObjectURL(selected) : '';
+        cursorPreviewImg.src = selected?.isDefault ? DEFAULT_CURSOR_ICON : createCursorObjectURL(selected);
         cursorPreviewImg.alt = selected ? selected.name : 'Cursor preview';
-        if (selected) {
+        if (selected?.isDefault) {
+            cursorPreviewBadge.style.cursor = 'auto';
+        } else if (selected) {
             const selectedHotspotX = selected.hotspotX ?? 16;
             const selectedHotspotY = selected.hotspotY ?? 16;
             cursorPreviewBadge.style.cursor = `url('${createCursorObjectURL(selected)}') ${selectedHotspotX} ${selectedHotspotY}, auto`;
@@ -1943,7 +1952,7 @@
             cursorPreviewBadge.style.cursor = 'auto';
         }
 
-        cursorEntries.forEach(entry => {
+        pickerEntries.forEach(entry => {
             const hotspotX = entry.hotspotX ?? 16;
             const hotspotY = entry.hotspotY ?? 16;
             const item = document.createElement('button');
@@ -1955,7 +1964,10 @@
 
             const img = document.createElement('img');
             img.className = 'cursor-preview-thumb';
-            img.src = createCursorObjectURL(entry);
+            if (entry.isDefault) {
+                img.classList.add('default-cursor-thumb');
+            }
+            img.src = entry.isDefault ? DEFAULT_CURSOR_ICON : createCursorObjectURL(entry);
             img.alt = entry.name;
             item.appendChild(img);
 
@@ -1964,18 +1976,21 @@
             label.textContent = entry.name;
             item.appendChild(label);
 
-            item.style.cursor = `url('${createCursorObjectURL(entry)}') ${hotspotX} ${hotspotY}, auto`;
+            item.style.cursor = entry.isDefault
+                ? 'auto'
+                : `url('${createCursorObjectURL(entry)}') ${hotspotX} ${hotspotY}, auto`;
             item.title = `Select "${entry.name}"`;
 
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 setSelectedCursorId(entry.id);
-                if (currentConfig.cursorEnabled) {
-                    currentCursorBlobUrl = createCursorObjectURL(entry);
-                    applyCustomCursor(currentCursorBlobUrl);
-                }
             });
+
+            if (entry.isDefault) {
+                cursorListContainer.appendChild(item);
+                return;
+            }
 
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
@@ -2127,16 +2142,22 @@
     const cursorUploadBtn = document.createElement('button');
     cursorUploadBtn.textContent = '📁 Upload Cursor';
     cursorUploadBtn.className = 'slidy-action-btn';
-    cursorUploadBtn.style.maxWidth = '120px';
+
+    const cursorToolbar = document.createElement('div');
+    cursorToolbar.className = 'slidy-setting-container';
 
     const cursorPreviewBadge = document.createElement('div');
     cursorPreviewBadge.className = 'cursor-preview-badge';
     cursorPreviewBadge.title = 'Selected cursor preview';
-    cursorPreviewBadge.style.display = 'none';
+    cursorPreviewBadge.style.display = 'inline-flex';
     const cursorPreviewImg = document.createElement('img');
     cursorPreviewImg.className = 'cursor-preview-badge-img';
     cursorPreviewImg.alt = 'Selected cursor';
     cursorPreviewBadge.appendChild(cursorPreviewImg);
+    cursorToolbar.appendChild(cursorUploadBtn);
+    cursorToolbar.appendChild(cursorPreviewBadge);
+    cursorPreviewBadge.style.marginLeft = 'auto';
+    cursorPreviewBadge.style.marginRight = '0';
 
     const cursorListContainer = document.createElement('div');
     cursorListContainer.className = 'cursor-list';
@@ -2869,21 +2890,6 @@
     });
     settings.puzzleAlwaysInCenter = puzzleAlwaysInCenterSetting;
 
-    const cursorEnabledSetting = createSetting({
-        id: 'cursor-enabled',
-        label: 'Enable cursor',
-        type: 'checkbox',
-        defaultValue: DEFAULT_CONFIG.cursorEnabled,
-        storageKey: STORAGE_KEYS.cursorEnabled,
-        onChange: (val) => toggleCustomCursor(val)
-    });
-    settings.cursorEnabled = cursorEnabledSetting;
-    cursorEnabledSetting.container.prepend(cursorUploadBtn);
-    cursorEnabledSetting.container.prepend(cursorPreviewBadge);
-    cursorPreviewBadge.style.marginLeft = 'auto';
-    cursorPreviewBadge.style.marginRight = '0';
-    cursorPreviewBadge.style.display = 'inline-flex';
-
     const rawHardwareInputSetting = createSetting({
         id: 'raw-hardware-input',
         label: 'Raw Hardware Input',
@@ -2975,7 +2981,7 @@
     ]);
 
     const cursorGroup = createGroup('🖱️ Cursor settings', [
-        cursorEnabledSetting.container,
+        cursorToolbar,
         cursorListContainer
     ]);
     cursorGroup.classList.add('cursor-settings-group');
@@ -3884,13 +3890,8 @@
             ensureCursorMetadata(entry);
             cursorEntries.push(entry);
             setSelectedCursorId(entry.id);
-            if (!currentConfig.cursorEnabled) {
-                settings.cursorEnabled.setValue(true);
-            }
-            if (currentConfig.cursorEnabled) {
-                currentCursorBlobUrl = entry.url;
-                applyCustomCursor(currentCursorBlobUrl);
-            }
+            currentCursorBlobUrl = entry.url;
+            applyCustomCursor(currentCursorBlobUrl);
             cursorFileInput.value = '';
         } catch (error) {
             console.error('Failed to save cursor:', error);
