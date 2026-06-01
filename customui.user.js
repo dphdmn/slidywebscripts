@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.54.2
+// @version      3.55.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4516,6 +4516,8 @@
 
     function applyPuzzleMutations(mutations) {
         const state = detectPuzzleState(mutations);
+        const isFirstInit = !liveStats;
+        initLiveContainer();
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (state === "scrambled") {
             formatSingleSolve(false);
@@ -4528,8 +4530,10 @@
                 exitEditMode();
             }
         } else if (state === "finished") {
-            trackSolve(getSolveFromTable());
-            liveStats.update();
+            if (!isFirstInit) {
+                trackSolve(getSolveFromTable());
+            }
+            liveStats?.update();
             scrambled = false;
             if (hideHeaderDuringSolves && !isZenMode) {
                 toggleHeader(true);
@@ -4537,7 +4541,6 @@
             highlightPBsInStatsGrid();
         } else {
             formatSingleSolve(false);
-            initLiveContainer();
             if (liveStats) {
                 const solveCheck = getSolveFromTable();
                 if (solveCheck) {
