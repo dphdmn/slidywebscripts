@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.55.2
+// @version      3.55.3
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -1453,6 +1453,7 @@
     let dragHandle = null;
     let scrambled = false;
     let positionApplied = false;
+    let previousSessionName = null;
     let isZenMode = false;
 
     const DEFAULT_CONFIG = {
@@ -3250,6 +3251,17 @@
     }
 
     function exitEditMode() {
+        if (pendingLeft !== null && pendingTop !== null && puzzleContainer) {
+            const clampedPosition = clampPuzzlePosition(pendingLeft, pendingTop);
+            settings.puzzleLeft.setValue(clampedPosition.left, { store: true, notify: false });
+            settings.puzzleTop.setValue(clampedPosition.top, { store: true, notify: false });
+            puzzleContainer.style.left = clampedPosition.left + 'px';
+            puzzleContainer.style.top = clampedPosition.top + 'px';
+            root.style.setProperty('--puzzle-left', `${clampedPosition.left}px`);
+            root.style.setProperty('--puzzle-top', `${clampedPosition.top}px`);
+            pendingLeft = null;
+            pendingTop = null;
+        }
         if (dragHandle) {
             dragHandle.removeEventListener('mousedown', onDragStart);
             dragHandle.removeEventListener('touchstart', onDragStart);
@@ -4522,6 +4534,23 @@
         const state = detectPuzzleState(mutations);
         initLiveContainer();
         formatSingleSolve(false);
+        let preservePosition = false;
+        if (liveSolvesData.length > 0) {
+            const solveCheck = getSolveFromTable();
+            if (!solveCheck || solveFromSameSession(solveCheck)) {
+                preservePosition = true;
+            }
+        }
+        if (!preservePosition) {
+            const sessionNameEl = document.querySelector('.session-name');
+            if (sessionNameEl) {
+                const currentSession = sessionNameEl.textContent.trim();
+                if (currentSession && currentSession === previousSessionName) {
+                    preservePosition = true;
+                }
+                previousSessionName = currentSession;
+            }
+        }
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (state === "scrambled") {
             unlockKeys();
@@ -4563,7 +4592,9 @@
         }
         initSound();
         if (!positionApplied) {
-            if (currentConfig.puzzleAlwaysInCenter) {
+            if (preservePosition) {
+                applyPuzzlePosition();
+            } else if (currentConfig.puzzleAlwaysInCenter) {
                 toggleCenterPosition();
             } else {
                 movePuzzleToTopLeft();
