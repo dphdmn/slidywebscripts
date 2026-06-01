@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.55.3
+// @version      3.55.4
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -3214,11 +3214,11 @@
         const focusContainer = document.querySelector('.focus-area');
         if (!focusContainer) return;
 
+        focusContainer.setAttribute('puzzle-position', 'center');
         const candidateOffset = getPuzzleTopLeftOffset();
         const topLeftOffset = clampPuzzlePosition(candidateOffset.left, candidateOffset.top);
         settings.puzzleLeft.setValue(topLeftOffset.left, { store: true, notify: false });
         settings.puzzleTop.setValue(topLeftOffset.top, { store: true, notify: false });
-        focusContainer.setAttribute('puzzle-position', 'center');
         applyPuzzlePosition();
     }
 
@@ -4534,6 +4534,7 @@
         const state = detectPuzzleState(mutations);
         initLiveContainer();
         formatSingleSolve(false);
+        document.querySelector('.focus-area')?.setAttribute('puzzle-position', 'center');
         let preservePosition = false;
         if (liveSolvesData.length > 0) {
             const solveCheck = getSolveFromTable();
