@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.55.4
+// @version      3.55.5
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4534,6 +4534,7 @@
         const state = detectPuzzleState(mutations);
         initLiveContainer();
         formatSingleSolve(false);
+        document.querySelector('.module-container')?.setAttribute('statistics-position', 'right');
         document.querySelector('.focus-area')?.setAttribute('puzzle-position', 'center');
         let preservePosition = false;
         if (liveSolvesData.length > 0) {
