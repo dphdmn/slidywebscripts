@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.55.1
+// @version      3.55.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4520,11 +4520,10 @@
 
     function applyPuzzleMutations(mutations) {
         const state = detectPuzzleState(mutations);
-        const isFirstInit = !liveStats;
         initLiveContainer();
+        formatSingleSolve(false);
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         if (state === "scrambled") {
-            formatSingleSolve(false);
             unlockKeys();
             scrambled = true;
             if (hideHeaderDuringSolves) {
@@ -4534,8 +4533,16 @@
                 exitEditMode();
             }
         } else if (state === "finished") {
-            if (!isFirstInit) {
+            if (scrambled) {
                 trackSolve(getSolveFromTable());
+            } else if (liveStats) {
+                const solveCheck = getSolveFromTable();
+                if (solveCheck && !solveFromSameSession(solveCheck)) {
+                    liveSolvesData.length = 0;
+                    resetBestValues();
+                    clearLiveTable();
+                    resetPBStylesInStatsGrid();
+                }
             }
             liveStats?.update();
             scrambled = false;
@@ -4544,16 +4551,13 @@
             }
             highlightPBsInStatsGrid();
         } else {
-            formatSingleSolve(false);
             if (liveStats) {
                 const solveCheck = getSolveFromTable();
-                if (solveCheck) {
-                    if (!(solveFromSameSession(solveCheck))) {
-                        liveSolvesData.length = 0;
-                        resetBestValues();
-                        clearLiveTable();
-                        resetPBStylesInStatsGrid();
-                    }
+                if (solveCheck && !solveFromSameSession(solveCheck)) {
+                    liveSolvesData.length = 0;
+                    resetBestValues();
+                    clearLiveTable();
+                    resetPBStylesInStatsGrid();
                 }
             }
         }
