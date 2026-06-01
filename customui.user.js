@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      3.55.5
+// @version      3.55.6
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -345,7 +345,7 @@
             border-top: none;
             border-left: none;
             padding: 12px;
-            min-width: 650px;
+            min-width: 670px;
         }
         .tab-widget-button-container {
             display: flex;
