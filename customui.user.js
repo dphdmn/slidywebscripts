@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.0.0
+// @version      4.0.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -57,7 +57,7 @@
             position: relative;     
             height: auto;            
             flex-shrink: 0;          
-            width: 310px;            
+            width: 336px;            
             min-width: 10px;
             background: #1a1a1a;
             color: #ddd;
@@ -285,7 +285,8 @@
         .left-hack, .center-hack, .right-hack {
             position: fixed !important;
             top: 0 !important;
-            max-width: 330px;
+            max-width: 336px;
+            border: none !important;
         }
         .left-hack td, .center-hack td, .right-hack td {
             font-size: 12px !important;
@@ -1410,7 +1411,7 @@
         }
         .standard-stats-panel {
             position: absolute !important;
-            right: 330px !important;
+            right: 336px !important;
             top: 0 !important;
             max-width: 250px !important;
             pointer-events: none;
@@ -1444,6 +1445,13 @@
             outline-style: solid !important;
             outline-color: var(--border-color-puzzle, transparent) !important;
             outline-offset: calc(-1 * var(--border-width-puzzle, 0px)) !important;
+        }
+        .stats-grid-container {
+            overflow: hidden !important;
+            min-width: 250px;
+        }
+        .timer-hack {
+            min-width: 336px;
         }
     `);
 
@@ -3793,14 +3801,17 @@
         if (!container) return;
         const standardStatsPanel = document.querySelector('.standard-stats-panel');
         const fmcStatsPanel = document.querySelector('.fewest-moves-stats-panel');
+        const timerContainer = document.querySelector('.stats-grid-container');
         const isFMC = !!fmcStatsPanel;
         if (!standardStatsPanel && !fmcStatsPanel) return;
         const hideTimer = currentConfig.hideTimerDuringSolves;
         container.classList.remove('rounded');
         const hideHeaderDuringSolves = currentConfig.hideHeaderDuringSolves;
         container.classList.remove('right-hack');
+        timerContainer.classList.remove('timer-hack');
         if (isZenMode || (hideHeaderDuringSolves && scrambled)) {
             container.classList.add('right-hack');
+            timerContainer.classList.add('timer-hack');
         }
         const thRow = container.querySelector('tr:has(th)');
         if (thRow) thRow.remove();
@@ -7943,7 +7954,7 @@
             return (cols * ONECELL) + snapOffset + (visibleGroupBorders * GROUP_BORDER_WIDTH);
         });
         const initialVisibleWidth = (2 + 3) * ONECELL + 10;
-        container.style.width = initialVisibleWidth + 20 + 'px';
+       // container.style.width = initialVisibleWidth + 20 + 'px';
         container.style.maxHeight = '100vh';
 
         let startX, startWidth;
