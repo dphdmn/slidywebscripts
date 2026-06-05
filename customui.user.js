@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.0.1
+// @version      4.0.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -5649,7 +5649,7 @@
                 const formatNumeric = (value) => {
                     if (value === Infinity) return '∞';
                     if (value === null) return 'DNF';
-                    return (Math.floor(value * 1000) / 1000).toFixed(3);
+                    return value.toFixed(3);
                 };
 
                 solves.push({
@@ -6167,7 +6167,7 @@
                         const formatNumeric = (value) => {
                             if (value === Infinity) return '∞';
                             if (value === null) return 'DNF';
-                            return (Math.floor(value * 1000) / 1000).toFixed(3);
+                            return value.toFixed(3);
                         };
 
                         if (results.length > 0) {
@@ -6281,7 +6281,7 @@
                         const formatNumeric = (value) => {
                             if (value === Infinity) return '∞';
                             if (value === null) return 'DNF';
-                            return (Math.floor(value * 1000) / 1000).toFixed(3);
+                            return value.toFixed(3);
                         };
 
                         for (let r of results) {
@@ -6340,7 +6340,7 @@
                     if (value === Infinity) return '∞';
                     if (value < 0) return "∞";
                     if (value === null || isNaN(value)) return 'DNF';
-                    return (Math.floor(value * 1000) / 1000).toFixed(3);
+                    return value.toFixed(3);
                 };
                 const formatInteger = (value) => {
                     if (value === null || isNaN(value)) return 'DNF';
