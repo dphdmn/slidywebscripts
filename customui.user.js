@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.1.1
+// @version      4.2.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -32,6 +32,22 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
+        .session-buttons-container {
+            transition: opacity 0.2s ease;
+        }
+
+        .session-buttons-container .session-button {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .session.margin:hover .session-buttons-container .session-button {
+            opacity: 1;
+        }
+
+        .session.margin:hover .session-buttons-container {
+            opacity: 1;
+        }
         .live-table td.pb-cell {
             color: cyan !important;
         }
@@ -3878,6 +3894,48 @@
         const visibleSessions = [];
         let maxDivCount = 0;
 
+        // Add separator after last pinned session
+        const sessionWrappers = document.querySelectorAll('.sessions > div');
+        let lastPinnedWrapper = null;
+
+        sessionWrappers.forEach(wrapper => {
+            const sessionMargin = wrapper.querySelector('.session.margin');
+            if (sessionMargin && sessionMargin.style.display !== 'none') {
+                const pinButton = wrapper.querySelector('.session-button.pin.pinned');
+                if (pinButton) {
+                    lastPinnedWrapper = wrapper;
+                }
+            }
+        });
+
+        if (lastPinnedWrapper) {
+            const existingSeparator = document.querySelector('.pinned-separator');
+            if (existingSeparator) existingSeparator.remove();
+
+            const separator = document.createElement('div');
+            separator.className = 'pinned-separator';
+            separator.style.cssText = `
+                grid-column: 1 / -1;
+                width: 100%;
+                height: 2px;
+                background: rgba(128, 128, 128, 0.3);
+                margin: 8px 0;
+                box-sizing: border-box;
+            `;
+
+            // Find the next sibling after lastPinnedWrapper that isn't hidden
+            let insertAfter = lastPinnedWrapper;
+            let next = lastPinnedWrapper.nextElementSibling;
+
+            // Skip any hidden elements
+            while (next && (next.style.display === 'none' || next.querySelector('.session.margin[style*="display: none"]'))) {
+                insertAfter = next;
+                next = next.nextElementSibling;
+            }
+
+            insertAfter.after(separator);
+        }
+
         swapSessionElements();
 
         sessionBackgrounds.forEach(bg => {
@@ -4037,6 +4095,31 @@
                 });
             }
         });
+        // Add click listeners to pin buttons to refresh sessions
+        const pinButtons = document.querySelectorAll('.session-button.pin');
+        pinButtons.forEach(button => {
+            if (!button.hasAttribute('data-slidy-pin-listener')) {
+                button.setAttribute('data-slidy-pin-listener', 'true');
+                button.addEventListener('click', () => {
+                    setTimeout(() => {
+                        // Reset the minimized flag
+                        const guardSessionInfo = document.querySelector('.session-info');
+                        if (guardSessionInfo) {
+                            guardSessionInfo.removeAttribute('data-slidy-sessions-minimized');
+                        }
+                        // Remove existing separator
+                        const existingSeparator = document.querySelector('.pinned-separator');
+                        if (existingSeparator) existingSeparator.remove();
+                        // Simulate click on Sessions tab
+                        const sessionsTab = [...document.querySelectorAll('button.tab')].find(tab => tab.textContent.trim() === 'Sessions');
+                        if (sessionsTab) {
+                            sessionsTab.click();
+                        }
+                    }, 10);
+                });
+            }
+        });
+
     }
 
     uploadBtn.addEventListener('click', (e) => {
@@ -7981,7 +8064,7 @@
             return (cols * ONECELL) + snapOffset + (visibleGroupBorders * GROUP_BORDER_WIDTH);
         });
         const initialVisibleWidth = (2 + 3) * ONECELL + 10;
-       // container.style.width = initialVisibleWidth + 20 + 'px';
+        // container.style.width = initialVisibleWidth + 20 + 'px';
         container.style.maxHeight = '100vh';
 
         let startX, startWidth;
