@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.0.2
+// @version      4.1.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4008,6 +4008,33 @@
                         }
                     }
                 }
+            }
+        });
+
+        const statsButtons = document.querySelectorAll('.session-button.statistics');
+        statsButtons.forEach(button => {
+            if (!button.hasAttribute('data-q-triggered')) {
+                button.setAttribute('data-q-triggered', 'true');
+                button.addEventListener('click', () => {
+                    const observer = new MutationObserver(() => {
+                        const container = document.querySelector('.session-statistics-page-container');
+                        if (container) {
+                            ['keydown', 'keyup'].forEach(eventType => {
+                                const event = new KeyboardEvent(eventType, {
+                                    key: 'q',
+                                    code: 'KeyQ',
+                                    keyCode: 81,
+                                    which: 81,
+                                    bubbles: true,
+                                    cancelable: true
+                                });
+                                document.dispatchEvent(event);
+                            });
+                            observer.disconnect();
+                        }
+                    });
+                    observer.observe(document.body, { childList: true, subtree: true });
+                });
             }
         });
     }
