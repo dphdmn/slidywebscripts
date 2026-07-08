@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.2.0
+// @version      4.2.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4293,8 +4293,7 @@
             if (m.type === 'childList' && target.nodeName?.toLowerCase() === 'td') {
                 for (const node of m.addedNodes) {
                     const text = node.textContent || '';
-
-                    if (text.includes('Session')) {
+                    if (text.includes('Session') || text.includes('Average of')) {
                         sawStatsUpdate = true;
                     }
                 }
