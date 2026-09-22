@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.3.1
+// @version      4.3.2
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -122,7 +122,8 @@
         .live-table {
             width: auto;
             min-width: 95%;          
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
         }
 
         .live-table thead {
@@ -7827,6 +7828,8 @@
     const BEST_KEYS = [1, 5, 12, 25, 50, 100];
     const bestValues = {};
 
+    const MAX_LIVE_ROWS = 50;
+
     function resetBestValues() {
         BEST_KEYS.forEach(k => {
             bestValues[k] = {
@@ -8276,6 +8279,9 @@
             fragment.appendChild(createOrderedSolveRow(liveSolvesData[i], rowKeys, liveSolvesData.length, false));
         }
         tbody.appendChild(fragment);
+        while (tbody.children.length > MAX_LIVE_ROWS) {
+            tbody.lastElementChild.remove();
+        }
         const headerEl = document.getElementById('solveCountHeader');
         if (headerEl) headerEl.textContent = liveSolvesData.length;
     }
@@ -8283,6 +8289,9 @@
     function appendSolveRow(tbody, solve, rowKeys) {
         const totalSolves = liveSolvesData.length;
         tbody.insertBefore(createOrderedSolveRow(solve, rowKeys, totalSolves, true), tbody.firstChild);
+        while (tbody.children.length > MAX_LIVE_ROWS) {
+            tbody.lastElementChild.remove();
+        }
     }
 
     let liveStats;
