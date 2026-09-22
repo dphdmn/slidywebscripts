@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.2.1
+// @version      4.3.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -36,17 +36,25 @@
             transition: opacity 0.2s ease;
         }
 
-        .session-buttons-container .session-button {
+        .session-buttons-container .session-button,
+        .session-buttons-column-left .session-button,
+        .session-buttons-column-right .session-button {
             opacity: 0;
             transition: opacity 0.2s ease;
         }
 
-        .session.margin:hover .session-buttons-container .session-button {
+        .session.margin:hover .session-buttons-container .session-button,
+        .session.margin:hover .session-buttons-column-left .session-button,
+        .session.margin:hover .session-buttons-column-right .session-button {
             opacity: 1;
         }
 
         .session.margin:hover .session-buttons-container {
             opacity: 1;
+        }
+        .session-button:hover {
+            width: 20px !important;
+            height: 20px !important;
         }
         .live-table td.pb-cell {
             color: cyan !important;
