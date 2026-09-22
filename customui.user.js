@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.3.0
+// @version      4.3.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -4838,6 +4838,7 @@
         let currentWorker = null;
         let sessionStatsDiv = null;
         let filterSummaryDiv = null;
+        let calcDebounce = null;
         let worker = null; // Web Worker reference for calculations
         const SESSION_GAP_MS = 60 * 60 * 1000;
 
@@ -5895,7 +5896,6 @@
             const select = document.querySelector('#avgs-session-select');
             if (!select) return;
 
-            const previousValue = select.value || 'all';
             const sessions = getSolveSessions(solves);
             select.innerHTML = '<option value="all">All sub-sessions</option>';
 
@@ -5910,7 +5910,14 @@
                 select.appendChild(option);
             });
 
-            select.value = Array.from(select.options).some(option => option.value === previousValue) ? previousValue : 'all';
+            let valueToSet;
+            if (sessions.length > 0) {
+                const latest = sessions[0];
+                valueToSet = `${latest.startId}:${latest.endId}`;
+            } else {
+                valueToSet = 'all';
+            }
+            select.value = valueToSet;
         }
 
         function applySolveRowFilters(solves) {
@@ -6331,7 +6338,6 @@
             if (!useDetailsForStats) {
                 const table = document.querySelector('.session-statistics-table')
                 addSortingListeners(table);
-                sortTable(table, 0, 'desc'); //reverse id by default
                 solves = filterSolves(allSolves);
                 applySolveRowFilters(allSolves);
                 if (resetBtn) resetBtn.style.display = 'none';
@@ -6893,16 +6899,27 @@
 
         function handleCalculateOrClick() {
             document.querySelector('#closeReplayBtn')?.click();
-            const firstTable = document.querySelector('.session-statistics-table');
 
-            calculateAvgs();
+            if (calcDebounce) clearTimeout(calcDebounce);
+            calcDebounce = setTimeout(() => {
+                calcDebounce = null;
 
-            if (firstTable) {
-                const rows = firstTable.querySelectorAll('tbody tr');
-                if (rows.length === 1) {
-                    rows[0].click();
+                const select = document.querySelector('#avgs-session-select');
+                if (select && !useDetailsForStats) {
+                    updateSessionFilterOptions();
+                    select.dispatchEvent(new Event('change'));
+                } else {
+                    calculateAvgs();
                 }
-            }
+
+                const firstTable = document.querySelector('.session-statistics-table');
+                if (firstTable) {
+                    const rows = firstTable.querySelectorAll('tbody tr');
+                    if (rows.length === 1) {
+                        rows[0].click();
+                    }
+                }
+            }, 50);
         }
 
         // ==================== GRAPH FUNCTIONS ====================
