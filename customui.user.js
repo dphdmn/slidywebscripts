@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.3.2
+// @version      4.4.0
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -22,6 +22,7 @@
     'use strict';
     const __listenerStore = new WeakMap();
     const originalAdd = EventTarget.prototype.addEventListener;
+    const ENABLE_INPUT_DEBUG = true; // set false to disable the top-left input debugging overlay
     let root;
 
     EventTarget.prototype.addEventListener = function (type, listener, options) {
@@ -592,6 +593,15 @@
             color: #ccc;
             font-size: 11px;
             min-width: 30px;
+        }
+        .slidy-number-input {
+            width: 64px;
+            background: #1e1e1e;
+            color: #ddd;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 11px;
         }
         .slidy-color-input {
             width: 24px;
@@ -1519,6 +1529,9 @@
         statsReplays: true,
         cursorEnabled: true,
         rawHardwareInput: false,
+        rawInputRate: 1000,
+        rawInputUncapped: true,
+        inputDebug: false,
         borderRadius: 0
     };
 
@@ -1553,6 +1566,9 @@
         cursorEnabled: 'slidysim_dph_script_cursor_enabled',
         selectedCursorId: 'slidysim_dph_script_cursor_selected',
         rawHardwareInput: 'slidysim_dph_script_raw_hardware_input',
+        rawInputRate: 'slidysim_dph_script_raw_input_rate',
+        rawInputUncapped: 'slidysim_dph_script_raw_input_uncapped',
+        inputDebug: 'slidysim_dph_script_input_debug',
         borderRadius: 'slidysim_dph_script_border_radius'
     };
 
@@ -1678,10 +1694,12 @@
         labelEl.className = 'slidy-setting-label';
         container.appendChild(labelEl);
 
-        let input, valueDisplay;
+        let input, valueDisplay, numInput;
 
         function updateValueDisplay() {
-            if (valueDisplay) {
+            if (numInput) {
+                numInput.value = input.value;
+            } else if (valueDisplay) {
                 updateSliderDisplay(input, valueDisplay, config);
             }
         }
@@ -1714,15 +1732,62 @@
                 input.value = defaultValue;
                 input.className = 'slidy-slider';
 
-                valueDisplay = document.createElement('span');
-                valueDisplay.className = 'slidy-slider-value';
-                updateValueDisplay();
+                let debounceTimer = null;
+                const notifyDebounced = (parsedValue) => {
+                    if (config.debounce) {
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(() => notifyChange(parsedValue), config.debounce);
+                    } else {
+                        notifyChange(parsedValue);
+                    }
+                };
+
+                if (config.showTextInput) {
+                    numInput = document.createElement('input');
+                    numInput.type = 'number';
+                    numInput.min = min;
+                    numInput.max = max;
+                    numInput.step = step;
+                    numInput.value = defaultValue;
+                    numInput.className = 'slidy-slider-value slidy-number-input';
+
+                    input.addEventListener('input', () => {
+                        const parsedValue = persistValue(input.value);
+                        numInput.value = parsedValue;
+                        notifyDebounced(parsedValue);
+                    });
+
+                    numInput.addEventListener('change', () => {
+                        let raw = parseFloat(numInput.value);
+                        if (isNaN(raw)) {
+                            numInput.value = input.value;
+                            return;
+                        }
+                        raw = Math.max(min, Math.min(max, raw));
+                        if (Number(step)) {
+                            raw = Math.round(raw / step) * step;
+                            raw = Math.max(min, Math.min(max, raw));
+                        }
+                        input.value = raw;
+                        numInput.value = raw;
+                        const parsedValue = persistValue(raw);
+                        notifyDebounced(parsedValue);
+                    });
+
+                    container.appendChild(input);
+                    container.appendChild(numInput);
+                    break;
+                }
 
                 input.addEventListener('input', () => {
                     const parsedValue = persistValue(input.value);
                     updateValueDisplay();
                     notifyChange(parsedValue);
                 });
+
+                valueDisplay = document.createElement('span');
+                valueDisplay.className = 'slidy-slider-value';
+                updateValueDisplay();
 
                 container.appendChild(input);
                 container.appendChild(valueDisplay);
@@ -3024,6 +3089,8 @@
         checked: DEFAULT_CONFIG.rawHardwareInput,
         storageKey: STORAGE_KEYS.rawHardwareInput,
         onChange: (val) => {
+            rawInputRateSetting.container.style.display = (val && !currentConfig.rawInputUncapped) ? '' : 'none';
+            rawInputUncappedSetting.container.style.display = val ? '' : 'none';
             if (val) {
                 overwriteInputs();
             } else {
@@ -3032,6 +3099,51 @@
         }
     });
     settings.rawHardwareInput = rawHardwareInputSetting;
+
+    const rawInputRateSetting = createSetting({
+        id: 'raw-input-rate',
+        label: 'Input Rate (Hz)',
+        type: 'slider',
+        defaultValue: DEFAULT_CONFIG.rawInputRate,
+        storageKey: STORAGE_KEYS.rawInputRate,
+        min: 10,
+        max: 8000,
+        step: 1,
+        showTextInput: true,
+        debounce: 150,
+        onChange: () => {
+            if (currentConfig.rawHardwareInput) overwriteInputs();
+        }
+    });
+    settings.rawInputRate = rawInputRateSetting;
+
+    const rawInputUncappedSetting = createSetting({
+        id: 'raw-input-uncapped',
+        label: 'Uncapped input rate (no throttle)',
+        type: 'checkbox',
+        checked: DEFAULT_CONFIG.rawInputUncapped,
+        storageKey: STORAGE_KEYS.rawInputUncapped,
+        onChange: (val) => {
+            rawInputRateSetting.container.style.display = (currentConfig.rawHardwareInput && !val) ? '' : 'none';
+            if (currentConfig.rawHardwareInput) overwriteInputs();
+        }
+    });
+    settings.rawInputUncapped = rawInputUncappedSetting;
+
+    rawInputRateSetting.container.style.display = (currentConfig.rawHardwareInput && !currentConfig.rawInputUncapped) ? '' : 'none';
+    rawInputUncappedSetting.container.style.display = currentConfig.rawHardwareInput ? '' : 'none';
+
+    const inputDebugSetting = createSetting({
+        id: 'input-debug',
+        label: 'Input Debug Overlay',
+        type: 'checkbox',
+        checked: DEFAULT_CONFIG.inputDebug,
+        storageKey: STORAGE_KEYS.inputDebug,
+        onChange: (val) => {
+            toggleInputDebug(Boolean(val));
+        }
+    });
+    settings.inputDebug = inputDebugSetting;
 
     const statsGraphsSetting = createSetting({
         id: 'stats-graphs',
@@ -3144,7 +3256,10 @@
         soundEnableSetting.container,
         soundVolumeSetting.container,
         soundDebounceSetting.container,
-        rawHardwareInputSetting.container
+        rawHardwareInputSetting.container,
+        rawInputUncappedSetting.container,
+        rawInputRateSetting.container,
+        inputDebugSetting.container
     ]);
 
     const miscGroup = createGroup('🧩 Layout settings', [
@@ -3648,22 +3763,127 @@
         }
     }
 
+    let _rawState = null;
+    const _inputStats = { rawEvents: 0, deliveredEvents: 0, enabled: false };
+
     function overwriteInputs() {
         const element = document.querySelector('.focus-area');
         if (!element) return;
         const listener = __listenerStore.get(element);
         if (!listener) return;
+
+        if (_rawState && _rawState.element === element) {
+            element.removeEventListener('pointerrawupdate', _rawState.handler, false);
+            _rawState = null;
+        }
+
+        const uncapped = currentConfig.rawInputUncapped;
+        const rate = Math.max(1, Number(currentConfig.rawInputRate) || 1000);
+
+        const state = { element, listener, handler: listener };
+        if (!uncapped) {
+            const interval = 1000 / rate;
+            let lastTs = 0;
+            state.handler = (e) => {
+                const now = (typeof e.timeStamp === 'number' && e.timeStamp > 0) ? e.timeStamp : performance.now();
+                if (now - lastTs >= interval) {
+                    lastTs = now;
+                    if (_inputStats.enabled) _inputStats.deliveredEvents++;
+                    listener(e);
+                }
+            };
+        } else {
+            state.handler = (e) => {
+                if (_inputStats.enabled) _inputStats.deliveredEvents++;
+                listener(e);
+            };
+        }
+
         element.removeEventListener('mousemove', listener, false);
-        element.addEventListener('pointerrawupdate', listener, false);
+        element.addEventListener('pointerrawupdate', state.handler, false);
+        _rawState = state;
     }
 
     function restoreInputs() {
+        if (_rawState) {
+            _rawState.element.removeEventListener('pointerrawupdate', _rawState.handler, false);
+            _rawState = null;
+        }
         const element = document.querySelector('.focus-area');
         if (!element) return;
         const listener = __listenerStore.get(element);
         if (!listener) return;
-        element.removeEventListener('pointerrawupdate', listener, false);
         element.addEventListener('mousemove', listener, false);
+    }
+
+    let _inputDebug = null;
+
+    function initInputDebugOverlay() {
+        if (!ENABLE_INPUT_DEBUG) return;
+        if (_inputDebug) return;
+        const el = document.createElement('div');
+        el.id = 'slidy-input-debug';
+        el.style.cssText = 'position:fixed;top:8px;left:8px;z-index:99999;background:rgba(0,0,0,0.8);color:#7eff7e;font:11px/1.45 monospace;padding:6px 8px;border-radius:4px;pointer-events:none;white-space:pre;user-select:none;';
+        document.body.appendChild(el);
+
+        const inFocusArea = (e) => !!(e.target && e.target.closest && e.target.closest('.focus-area'));
+        const onRawUpdate = (e) => {
+            if (inFocusArea(e)) _inputStats.rawEvents++;
+        };
+        const onMouseMove = (e) => {
+            if (inFocusArea(e) && !currentConfig.rawHardwareInput) _inputStats.deliveredEvents++;
+        };
+        document.addEventListener('pointerrawupdate', onRawUpdate, true);
+        document.addEventListener('mousemove', onMouseMove, true);
+
+        let frames = 0;
+        let rafId = requestAnimationFrame(function rafLoop() {
+            frames++;
+            rafId = requestAnimationFrame(rafLoop);
+        });
+
+        let prevRaw = 0, prevDelivered = 0, prevFrames = 0;
+        const intervalId = setInterval(() => {
+            const rawHz = _inputStats.rawEvents - prevRaw;
+            const deliveredHz = _inputStats.deliveredEvents - prevDelivered;
+            const monitorHz = frames - prevFrames;
+            prevRaw = _inputStats.rawEvents;
+            prevDelivered = _inputStats.deliveredEvents;
+            prevFrames = frames;
+            const setting = currentConfig.rawHardwareInput
+                ? (currentConfig.rawInputUncapped ? 'uncapped' : currentConfig.rawInputRate + 'Hz')
+                : 'off';
+            el.textContent =
+                'INPUT DEBUG\n' +
+                `raw:     ${rawHz} Hz\n` +
+                `active:  ${deliveredHz} Hz\n` +
+                `monitor: ${monitorHz} Hz\n` +
+                `setting: ${setting}`;
+        }, 1000);
+
+        _inputStats.enabled = true;
+        _inputDebug = { el, onRawUpdate, onMouseMove, rafId, intervalId };
+    }
+
+    function destroyInputDebug() {
+        if (!_inputDebug) return;
+        document.removeEventListener('pointerrawupdate', _inputDebug.onRawUpdate, true);
+        document.removeEventListener('mousemove', _inputDebug.onMouseMove, true);
+        cancelAnimationFrame(_inputDebug.rafId);
+        clearInterval(_inputDebug.intervalId);
+        _inputDebug.el.remove();
+        _inputDebug = null;
+        _inputStats.rawEvents = 0;
+        _inputStats.deliveredEvents = 0;
+        _inputStats.enabled = false;
+    }
+
+    function toggleInputDebug(show) {
+        if (show) {
+            initInputDebugOverlay();
+        } else {
+            destroyInputDebug();
+        }
     }
 
     function applyPuzzlePosition() {
@@ -4802,6 +5022,10 @@
         const graphsEnabled = settings.statsGraphs?.getValue() !== false;
         const avgsEnabled = settings.statsAverages?.getValue() !== false;
         const replaysEnabled = settings.statsReplays?.getValue() !== false;
+
+        if (ENABLE_INPUT_DEBUG && currentConfig.inputDebug !== false) {
+            initInputDebugOverlay();
+        }
 
         if (!graphsEnabled && !avgsEnabled && !replaysEnabled) {
             return;
