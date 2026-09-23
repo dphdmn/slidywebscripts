@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.4.0
+// @version      4.4.1
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -6121,6 +6121,14 @@
             const select = document.querySelector('#avgs-session-select');
             if (!select) return;
 
+            const oldestTick = solves.reduce((min, solve) => {
+                if (!solve.date) return min;
+                const tick = solve.date.getTime();
+                return min === null || tick < min ? tick : min;
+            }, null);
+            const scopeKey = oldestTick === null ? '' : String(oldestTick);
+            const sameScope = select.dataset.slidyScope === scopeKey;
+            const previousValue = select.value || 'all';
             const sessions = getSolveSessions(solves);
             select.innerHTML = '<option value="all">All sub-sessions</option>';
 
@@ -6135,14 +6143,23 @@
                 select.appendChild(option);
             });
 
-            let valueToSet;
-            if (sessions.length > 0) {
-                const latest = sessions[0];
-                valueToSet = `${latest.startId}:${latest.endId}`;
-            } else {
-                valueToSet = 'all';
+            let valueToSet = null;
+            if (sameScope) {
+                if (previousValue === 'all') {
+                    valueToSet = 'all';
+                } else {
+                    const previousStartId = parseInt(previousValue.split(':')[0], 10);
+                    const match = sessions.find(session => session.startId === previousStartId);
+                    if (match) valueToSet = `${match.startId}:${match.endId}`;
+                }
+            }
+            if (valueToSet === null) {
+                valueToSet = sessions.length > 0
+                    ? `${sessions[0].startId}:${sessions[0].endId}`
+                    : 'all';
             }
             select.value = valueToSet;
+            select.dataset.slidyScope = scopeKey;
         }
 
         function applySolveRowFilters(solves) {
