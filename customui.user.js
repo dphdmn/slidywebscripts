@@ -234,14 +234,8 @@
             outline-offset: calc(-1 * var(--border-width-grids, 0px));
         }
         .multi-select-button,
-        .ranking-table,
-        .ranking-table-container,
-        .ranking-form-container,
-        .home-container-side,
         .standard-stats-panel,
-        .session-background,
         .session-statistics-page-container,
-        .dialog,
         .fewest-moves-stats-panel,
         .fewest-moves-data-panel,
         .fewest-moves-input,
@@ -254,6 +248,21 @@
             background-color: rgba(35, 35, 35, var(--ui-opacity, 1));
         }
 
+        .ranking-table-container,
+        .ranking-form-container,
+        .home-container-side,
+        .modal-content,
+        .session-statistics-table-container {
+            background-color: color-mix(in srgb, var(--bg-surface) var(--ui-opacity-percent, 100%), transparent) !important;
+        }
+
+        .ranking-form-container .form-row:has(> .value-container > button) {
+            background-color: #2a2a2a00; !important;
+        }
+
+        .tab-widget-content-container {
+            background: #2a2a2a00; !important;
+        }
         
         input[type="checkbox"] {
             -webkit-appearance: none !important;
@@ -368,7 +377,7 @@
             margin: 0;
             max-height: calc(100vh - var(--header_height));
             overflow-y: auto;
-            background: #1a1a1a;
+            background: color-mix(in srgb, var(--bg-surface) var(--ui-opacity-percent, 100%), transparent);
             border-right: 1px solid #444;
             border-bottom: 1px solid #444;
             border-top: none;
@@ -411,7 +420,6 @@
             color: #fff;
         }
         .tab-widget-content-container {
-            background: #222;
             border: 1px solid #00bcd4;
             border-top: none;
             padding: 10px;
@@ -3778,8 +3786,10 @@
     function applyUIOpacity(opacity) {
         if (opacity) {
             root.style.setProperty('--ui-opacity', opacity);
+            root.style.setProperty('--ui-opacity-percent', `${opacity * 100}%`);
         } else {
             root.style.removeProperty('--ui-opacity');
+            root.style.removeProperty('--ui-opacity-percent');
         }
     }
 
