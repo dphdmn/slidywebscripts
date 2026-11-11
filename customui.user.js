@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SlidySim UI Customization
 // @namespace    dphdmn
-// @version      4.4.1
+// @version      4.5.0 beta
 // @description  Customize SlidySim with background images, piece borders, font customization, grids border, base9, sound effects, stats improvements, graphs, and more
 // @author       dphdmn
 // @match        https://play.slidysim.com/*
@@ -168,41 +168,34 @@
         }
 
 
-        .session-statistics-table th {
+        .avgs-load-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 8px 0;
+        }
+        .avgs-load-actions .avgs-load-advanced-btn {
+            margin: 0;
+        }
+        .avgs-load-advanced-btn {
+            display: block;
+            margin: 8px 0;
+            padding: 8px 16px;
+            background: rgba(0, 155, 121, 0.85);
+            border: 1px solid #0891b2;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            user-select: none;
-            position: relative;
-            padding-right: 20px;
-            transition: background-color 0.2s;
+            border-radius: 4px;
         }
-
-        .session-statistics-table th:hover {
-            background-color: rgba(0, 155, 121, 0.49);
+        .avgs-load-advanced-btn:hover:not(:disabled) {
+            background: rgba(0, 180, 140, 0.95);
+            border-color: #00bcd4;
         }
-
-        /* Sort direction indicators based on table's data attributes */
-        .session-statistics-table[data-sort-direction-0="asc"] th:nth-child(1)::after,
-        .session-statistics-table[data-sort-direction-1="asc"] th:nth-child(2)::after,
-        .session-statistics-table[data-sort-direction-2="asc"] th:nth-child(3)::after,
-        .session-statistics-table[data-sort-direction-3="asc"] th:nth-child(4)::after,
-        .session-statistics-table[data-sort-direction-4="asc"] th:nth-child(5)::after {
-            content: '▲';
-            position: absolute;
-            right: 8px;
-            font-size: 12px;
-            color: #ffffff;
-        }
-
-        .session-statistics-table[data-sort-direction-0="desc"] th:nth-child(1)::after,
-        .session-statistics-table[data-sort-direction-1="desc"] th:nth-child(2)::after,
-        .session-statistics-table[data-sort-direction-2="desc"] th:nth-child(3)::after,
-        .session-statistics-table[data-sort-direction-3="desc"] th:nth-child(4)::after,
-        .session-statistics-table[data-sort-direction-4="desc"] th:nth-child(5)::after {
-            content: '▼';
-            position: absolute;
-            right: 8px;
-            font-size: 12px;
-            color: #ffffff;
+        .avgs-load-advanced-btn:disabled {
+            opacity: 0.7;
+            cursor: default;
         }
 
         .module-container2 {
@@ -4305,7 +4298,8 @@
                 button.addEventListener('click', () => {
                     const observer = new MutationObserver(() => {
                         const container = document.querySelector('.session-statistics-page-container');
-                        if (container) {
+                        const table = document.querySelector('.session-statistics-table');
+                        if (container && table) {
                             ['keydown', 'keyup'].forEach(eventType => {
                                 const event = new KeyboardEvent(eventType, {
                                     key: 'q',
@@ -5053,6 +5047,17 @@
         let useDetailsForStats = false;
         let extractedSolvesMain = [];
         let extractedSolvesDetails = [];
+        let capturedMainRows = null;
+        let statsCloseObserver = null;
+        let loadActionsContainer = null;
+        let loadedScope = 'none';
+        let isLoadingSessionSolves = false;
+        let ignoreStatsTableMutationsUntil = 0;
+        let statsResetRaf = null;
+        let statsTablesWatcher = null;
+        let statsTablesCheckRaf = null;
+        let observedMainTable = null;
+        let lastStatsScrollAt = 0;
 
 
         // Calculator variables
@@ -5455,49 +5460,569 @@
             });
         }
 
-        function addSolveRowListeners() {
-            const tables = document.querySelectorAll('.session-statistics-table');
-            const closeObserver = new MutationObserver(() => {
-                const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
-                if (!tablesContainer) {
-                    document.querySelector('#closeReplayBtn')?.click();
-                    closeObserver.disconnect();
+        function getSessionStatsScrollTargets() {
+            const targets = new Set();
+            const consider = (el) => {
+                if (!el || el === document.body || el === document.documentElement) return;
+                const style = window.getComputedStyle(el);
+                if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+                    targets.add(el);
                 }
+            };
+
+            const page = document.querySelector('.session-statistics-page-container');
+            let node = document.querySelector('.session-statistics-table');
+            while (node && node !== document.body) {
+                consider(node);
+                node = node.parentElement;
+            }
+
+            ['.session-statistics-table-container',
+                '.session-statistics-page-tables-container',
+                '.session-statistics-page-inner-container',
+                '.session-statistics-page-container'].forEach(selector => {
+                const el = document.querySelector(selector);
+                if (el) targets.add(el);
             });
 
-            closeObserver.observe(document.body, { childList: true, subtree: true });
+            if (page) {
+                consider(page);
+                page.querySelectorAll('*').forEach(consider);
+            }
+
+            return Array.from(targets);
+        }
+
+        function readMainTableRows() {
+            const table = document.querySelector('.session-statistics-table');
+            if (!table) return [];
+            const rows = [];
+            table.querySelectorAll('tbody tr').forEach(row => {
+                const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());
+                if (cells.length < 2) return;
+                const solveId = parseInt(cells[0], 10);
+                if (Number.isNaN(solveId)) return;
+                rows.push({
+                    solveId,
+                    cells,
+                    date: parseDateFromTable(cells[4] || '')
+                });
+            });
+            return rows;
+        }
+
+        function getTableSignature(targets) {
+            const table = document.querySelector('.session-statistics-table');
+            const rows = table ? table.querySelectorAll('tbody tr') : [];
+            const first = rows[0]?.querySelector('td')?.textContent.trim() || '';
+            const last = rows[rows.length - 1]?.querySelector('td')?.textContent.trim() || '';
+            const heights = targets.map(el => el.scrollHeight).join(',');
+            return `${rows.length}|${first}|${last}|${heights}`;
+        }
+
+        function waitForTableChange(targets, action, quietFrameLimit = 18) {
+            return new Promise(resolve => {
+                const start = getTableSignature(targets);
+                let finished = false;
+                let quietFrames = 0;
+                let rafId = null;
+                let timerId = null;
+                let observer = null;
+                let resizeObserver = null;
+
+                const finish = (changed) => {
+                    if (finished) return;
+                    finished = true;
+                    if (observer) observer.disconnect();
+                    if (resizeObserver) resizeObserver.disconnect();
+                    if (rafId !== null) cancelAnimationFrame(rafId);
+                    if (timerId !== null) clearTimeout(timerId);
+                    resolve(changed);
+                };
+
+                const check = () => {
+                    if (finished) return true;
+                    if (getTableSignature(targets) !== start) {
+                        finish(true);
+                        return true;
+                    }
+                    return false;
+                };
+
+                observer = new MutationObserver(check);
+                const table = document.querySelector('.session-statistics-table');
+                if (table) observer.observe(table, { childList: true, subtree: true, characterData: true });
+
+                if ('ResizeObserver' in window) {
+                    resizeObserver = new ResizeObserver(check);
+                    targets.forEach(el => {
+                        try { resizeObserver.observe(el); } catch (e) { /* ignore */ }
+                    });
+                }
+
+                const schedule = () => {
+                    if (document.hidden) {
+                        timerId = setTimeout(tick, 16);
+                    } else {
+                        rafId = requestAnimationFrame(tick);
+                    }
+                };
+
+                const tick = () => {
+                    rafId = null;
+                    timerId = null;
+                    if (finished) return;
+                    if (check()) return;
+                    quietFrames++;
+                    if (quietFrames >= quietFrameLimit) {
+                        finish(false);
+                        return;
+                    }
+                    schedule();
+                };
+
+                if (action) action();
+                schedule();
+            });
+        }
+
+        function scrollTargetsTo(targets, bottom) {
+            const notify = (el) => {
+                if (el && typeof el.dispatchEvent === 'function') el.dispatchEvent(new Event('scroll'));
+            };
+            targets.forEach(el => {
+                el.scrollTop = bottom ? el.scrollHeight : 0;
+                notify(el);
+            });
+            const scrollingElement = document.scrollingElement;
+            if (scrollingElement) {
+                scrollingElement.scrollTop = bottom ? scrollingElement.scrollHeight : 0;
+                notify(scrollingElement);
+                notify(window);
+            }
+        }
+
+        function stepScrollTargets(targets, ratio) {
+            const notify = (el) => {
+                if (el && typeof el.dispatchEvent === 'function') el.dispatchEvent(new Event('scroll'));
+            };
+            targets.forEach(el => {
+                const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
+                const step = Math.max(Math.floor(el.clientHeight * ratio), 100);
+                el.scrollTop = Math.min(el.scrollTop + step, maxTop);
+                notify(el);
+            });
+            const scrollingElement = document.scrollingElement;
+            if (scrollingElement) {
+                const maxTop = Math.max(0, scrollingElement.scrollHeight - scrollingElement.clientHeight);
+                const step = Math.max(Math.floor(window.innerHeight * ratio), 100);
+                scrollingElement.scrollTop = Math.min(scrollingElement.scrollTop + step, maxTop);
+                notify(scrollingElement);
+                notify(window);
+            }
+        }
+
+        function isScrollAtBottom(targets) {
+            const targetsAtBottom = targets.every(el =>
+                el.scrollTop + el.clientHeight >= el.scrollHeight - 4
+            );
+            const scrollingElement = document.scrollingElement;
+            if (!scrollingElement || scrollingElement.scrollHeight <= scrollingElement.clientHeight + 1) {
+                return targetsAtBottom;
+            }
+            return targetsAtBottom &&
+                scrollingElement.scrollTop + scrollingElement.clientHeight >= scrollingElement.scrollHeight - 4;
+        }
+
+        function captureMainTableRows(rowsMap) {
+            const table = document.querySelector('.session-statistics-table');
+            if (!table) return 0;
+            const domRows = table.querySelectorAll('tbody tr');
+            domRows.forEach(row => {
+                const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());
+                if (cells.length < 2) return;
+                const solveId = parseInt(cells[0], 10);
+                if (Number.isNaN(solveId)) return;
+                rowsMap.set(solveId, {
+                    solveId,
+                    cells,
+                    date: parseDateFromTable(cells[4] || '')
+                });
+            });
+            return domRows.length;
+        }
+
+        function finalizeCapturedRows(rowsMap, scope) {
+            const rows = Array.from(rowsMap.values()).sort((a, b) => b.solveId - a.solveId);
+            let finalRows = rows;
+            if (scope === 'last') {
+                finalRows = findLatestSessionBoundary(rows).rows;
+            }
+            if (!finalRows.length) return false;
+            capturedMainRows = finalRows
+                .slice()
+                .sort((a, b) => a.solveId - b.solveId)
+                .map(r => r.cells);
+            return true;
+        }
+
+        function readSolveIdOrder() {
+            const rows = readMainTableRows();
+            const ids = rows.slice(0, 12).map(r => r.solveId);
+            if (ids.length < 2) return 0;
+            let descending = true;
+            let ascending = true;
+            for (let i = 1; i < ids.length; i++) {
+                if (ids[i] > ids[i - 1]) descending = false;
+                if (ids[i] < ids[i - 1]) ascending = false;
+            }
+            if (descending && !ascending) return -1;
+            if (ascending && !descending) return 1;
+            return 0;
+        }
+
+        function getHeaderSortDirection(header) {
+            const aria = (header.getAttribute('aria-sort') || '').toLowerCase();
+            if (aria === 'descending') return -1;
+            if (aria === 'ascending') return 1;
+            const className = (header.className || '').toLowerCase();
+            if (className.includes('desc')) return -1;
+            if (className.includes('asc')) return 1;
+            const label = header.textContent || '';
+            if (/[▼▾↓]/.test(label)) return -1;
+            if (/[▲▴↑]/.test(label)) return 1;
+            return 0;
+        }
+
+        function simulateClick(el) {
+            if (!el) return;
+            try {
+                const rect = el.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + rect.height / 2;
+                const base = {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: x,
+                    clientY: y,
+                    button: 0
+                };
+
+                if (typeof PointerEvent === 'function') {
+                    el.dispatchEvent(new PointerEvent('pointerdown', { ...base, buttons: 1, pointerId: 1, pointerType: 'mouse' }));
+                }
+                el.dispatchEvent(new MouseEvent('mousedown', { ...base, buttons: 1 }));
+                if (typeof PointerEvent === 'function') {
+                    el.dispatchEvent(new PointerEvent('pointerup', { ...base, buttons: 0, pointerId: 1, pointerType: 'mouse' }));
+                }
+                el.dispatchEvent(new MouseEvent('mouseup', { ...base, buttons: 0 }));
+                el.dispatchEvent(new MouseEvent('click', { ...base, buttons: 0, detail: 1 }));
+            } catch (e) {
+                el.click();
+            }
+        }
+
+        function getSolveHeader() {
+            const table = document.querySelector('.session-statistics-table');
+            if (!table) return null;
+            const headers = Array.from(table.querySelectorAll('thead th'));
+            return headers.find(th => th.textContent.trim().toLowerCase().includes('solve')) || headers[0] || null;
+        }
+
+        async function ensureSolveHeaderNewestFirst(targets) {
+            if (!getSolveHeader()) return false;
+
+            const isNewestFirst = () => {
+                const order = readSolveIdOrder();
+                if (order !== 0) return order === -1;
+                const header = getSolveHeader();
+                return !!header && getHeaderSortDirection(header) === -1;
+            };
+            if (isNewestFirst()) return true;
+
+            for (let attempt = 0; attempt < 8; attempt++) {
+                const header = getSolveHeader();
+                if (!header) return false;
+
+                const rect = header.getBoundingClientRect();
+                const point = rect.width && rect.height
+                    ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+                    : null;
+
+                const candidates = [];
+                if (point && (point === header || header.contains(point))) candidates.push(point);
+                const button = header.querySelector('button');
+                if (button) candidates.push(button);
+                header.querySelectorAll('[class*="sort"], svg, i').forEach(el => candidates.push(el));
+                if (header.firstElementChild) candidates.push(header.firstElementChild);
+                if (header.lastElementChild) candidates.push(header.lastElementChild);
+                candidates.push(header);
+
+                let changed = false;
+                for (const clickTarget of new Set(candidates)) {
+                    changed = await waitForTableChange(targets, () => simulateClick(clickTarget));
+                    if (changed) break;
+                }
+
+                if (changed && isNewestFirst()) return true;
+            }
+            return false;
+        }
+
+        function findLatestSessionBoundary(rows) {
+            const dated = rows
+                .filter(r => r.date)
+                .sort((a, b) => b.date - a.date || b.solveId - a.solveId);
+
+            for (let i = 1; i < dated.length; i++) {
+                if (dated[i - 1].date - dated[i].date > SESSION_GAP_MS) {
+                    return { found: true, rows: dated.slice(0, i) };
+                }
+            }
+            return { found: false, rows };
+        }
+
+        async function loadSessionSolves(scope, onProgress) {
+            isLoadingSessionSolves = true;
+            try {
+                return await loadSessionSolvesInternal(scope, onProgress);
+            } finally {
+                if (document.hidden) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                } else {
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                }
+                isLoadingSessionSolves = false;
+                ignoreStatsTableMutationsUntil = Date.now() + 750;
+                addSolveRowListeners();
+            }
+        }
+
+        async function loadSessionSolvesInternal(scope, onProgress) {
+            let table = document.querySelector('.session-statistics-table');
+            if (!table) return false;
+
+            let targets = getSessionStatsScrollTargets();
+            const deadline = Date.now() + 120000;
+
+            for (let i = 0; i < 10 && !table.querySelector('tbody tr'); i++) {
+                await waitForTableChange(targets, null, 12);
+            }
+
+            scrollTargetsTo(targets, false);
+
+            if (scope === 'last') {
+                await waitForTableChange(targets, () => scrollTargetsTo(targets, false), 6);
+                await ensureSolveHeaderNewestFirst(targets);
+                table = document.querySelector('.session-statistics-table');
+                targets = getSessionStatsScrollTargets();
+                await waitForTableChange(targets, () => scrollTargetsTo(targets, false), 6);
+            }
+
+            const hasLatestSessionGap = (rowsMap) => {
+                if (scope !== 'last') return false;
+                if (readSolveIdOrder() !== -1) return false;
+                const rows = Array.from(rowsMap.values()).sort((a, b) => b.solveId - a.solveId);
+                return findLatestSessionBoundary(rows).found;
+            };
+
+            scrollTargetsTo(targets, false);
+            let rowsMap = new Map();
+            captureMainTableRows(rowsMap);
+
+            if (hasLatestSessionGap(rowsMap)) {
+                return finalizeCapturedRows(rowsMap, scope);
+            }
+
+            let quietRounds = 0;
+
+            while (Date.now() < deadline) {
+                const currentTable = document.querySelector('.session-statistics-table');
+                if (!currentTable) break;
+                if (currentTable !== table) {
+                    table = currentTable;
+                    targets = getSessionStatsScrollTargets();
+                }
+
+                const atBottom = isScrollAtBottom(targets);
+                const before = getTableSignature(targets);
+                const beforeSize = rowsMap.size;
+
+                if (atBottom) {
+                    await waitForTableChange(targets, () => scrollTargetsTo(targets, true), 18);
+                } else {
+                    await waitForTableChange(targets, () => stepScrollTargets(targets, 0.85), 1);
+                }
+
+                captureMainTableRows(rowsMap);
+
+                if (hasLatestSessionGap(rowsMap)) break;
+                if (onProgress) onProgress(rowsMap.size);
+
+                const after = getTableSignature(targets);
+                if (before === after && rowsMap.size === beforeSize) {
+                    if (atBottom) {
+                        quietRounds++;
+                        if (quietRounds >= 4) break;
+                    }
+                } else {
+                    quietRounds = 0;
+                }
+            }
+
+            return finalizeCapturedRows(rowsMap, scope);
+        }
+
+        function showAdvancedStats() {
+            if (calculatorContainer && calculatorContainer.isConnected) {
+                calculatorContainer.style.display = '';
+                return;
+            }
 
             const innerContainer = document.querySelector('.session-statistics-page-inner-container');
             const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
+            if (!innerContainer || !tablesContainer) return;
 
-            if (innerContainer && tablesContainer && !calculatorContainer && avgsEnabled) {
-                calculatorContainer = createCalculator();
-                innerContainer.insertBefore(calculatorContainer, tablesContainer);
-                setupEventListeners(calculatorContainer);
-                setTimeout(handleCalculateOrClick, 100);
+            calculatorContainer = createCalculator();
+            const parent = tablesContainer.parentNode || innerContainer;
+            parent.insertBefore(calculatorContainer, tablesContainer);
+            setupEventListeners(calculatorContainer);
 
-                const graphsEnabled = settings.statsGraphs?.getValue() !== false;
-                if (!graphsEnabled) {
-                    const graphsContainer = document.querySelector('#avgs-graphs-container');
-                    if (graphsContainer) graphsContainer.style.display = 'none';
-                }
+            const graphsEnabled = settings.statsGraphs?.getValue() !== false;
+            if (!graphsEnabled) {
+                const graphsContainer = document.querySelector('#avgs-graphs-container');
+                if (graphsContainer) graphsContainer.style.display = 'none';
+            }
+        }
 
-                let tableUpdateTimeout = null;
-                const tableContainer = document.querySelector('.session-statistics-table-container');
-                if (tableContainer && !tableContainer.hasAttribute('data-stats-observer')) {
-                    tableContainer.setAttribute('data-stats-observer', 'true');
-                    const statsObserver = new MutationObserver((mutations) => {
-                        if (currentlySorting) return;
-                        if (outputArea && !outputArea.value.includes('Calculating...')) {
-                            if (tableUpdateTimeout) clearTimeout(tableUpdateTimeout);
-                            extractedSolvesMain.length = 0;
-                            extractedSolvesDetails.length = 0;
-                            useDetailsForStats = false;
-                            tableUpdateTimeout = setTimeout(handleCalculateOrClick, 50);
-                        }
+        function updateLoadActionsState() {
+            if (!loadActionsContainer || !loadActionsContainer.isConnected) return;
+            if (loadActionsContainer.dataset.loading === 'true') return;
+            const lastBtn = loadActionsContainer.querySelector('[data-scope="last"]');
+            const allBtn = loadActionsContainer.querySelector('[data-scope="all"]');
+            if (!lastBtn || !allBtn) return;
+
+            if (loadedScope === 'all') {
+                loadActionsContainer.remove();
+                loadActionsContainer = null;
+                return;
+            }
+
+            lastBtn.disabled = loadedScope === 'last';
+            lastBtn.textContent = loadedScope === 'last' ? 'Last session loaded' : 'Load last session';
+            allBtn.disabled = false;
+            allBtn.textContent = 'Load all solves';
+        }
+
+        function ensureAdvancedStatsButton() {
+            const innerContainer = document.querySelector('.session-statistics-page-inner-container');
+            const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
+            if (!innerContainer || !tablesContainer) return;
+            if (loadedScope === 'all' && calculatorContainer && calculatorContainer.isConnected) return;
+
+            if (loadActionsContainer && loadActionsContainer.isConnected) {
+                updateLoadActionsState();
+                return;
+            }
+
+            const container = document.createElement('div');
+            container.className = 'avgs-load-actions';
+
+            const lastBtn = document.createElement('button');
+            lastBtn.type = 'button';
+            lastBtn.className = 'avgs-load-advanced-btn';
+            lastBtn.dataset.scope = 'last';
+            lastBtn.textContent = 'Load last session';
+
+            const allBtn = document.createElement('button');
+            allBtn.type = 'button';
+            allBtn.className = 'avgs-load-advanced-btn';
+            allBtn.dataset.scope = 'all';
+            allBtn.textContent = 'Load all solves';
+
+            container.appendChild(lastBtn);
+            container.appendChild(allBtn);
+
+            const runLoad = async (scope, button) => {
+                if (container.dataset.loading === 'true') return;
+                container.dataset.loading = 'true';
+                container.querySelectorAll('button').forEach(btn => { btn.disabled = true; });
+                const originalText = button.textContent;
+                const label = scope === 'last' ? 'last session' : 'all solves';
+
+                try {
+                    const loaded = await loadSessionSolves(scope, (count) => {
+                        button.textContent = `Loading ${label}... ${count} loaded`;
                     });
-                    statsObserver.observe(tableContainer, { childList: true, subtree: true, characterData: true });
+
+                    if (!loaded) {
+                        container.dataset.loading = 'false';
+                        button.textContent = originalText;
+                        updateLoadActionsState();
+                        return;
+                    }
+
+                    button.textContent = 'Computing...';
+                    extractedSolvesMain.length = 0;
+                    extractedSolvesDetails.length = 0;
+                    useDetailsForStats = false;
+                    loadedScope = scope;
+                    container.dataset.loading = 'false';
+
+                    showAdvancedStats();
+                    updateLoadActionsState();
+                    handleCalculateOrClick();
+                } catch (error) {
+                    console.error('Failed to load advanced stats:', error);
+                    container.dataset.loading = 'false';
+                    button.textContent = originalText;
+                    updateLoadActionsState();
                 }
+            };
+
+            lastBtn.addEventListener('click', () => runLoad('last', lastBtn));
+            allBtn.addEventListener('click', () => runLoad('all', allBtn));
+
+            loadActionsContainer = container;
+            const parent = tablesContainer.parentNode || innerContainer;
+            parent.insertBefore(container, tablesContainer);
+            updateLoadActionsState();
+        }
+
+        function addSolveRowListeners() {
+            const tables = document.querySelectorAll('.session-statistics-table');
+
+            if (!statsCloseObserver) {
+                statsCloseObserver = new MutationObserver(() => {
+                    const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
+                    if (!tablesContainer) {
+                        document.querySelector('#closeReplayBtn')?.click();
+                        statsCloseObserver.disconnect();
+                        statsCloseObserver = null;
+                    }
+                });
+                statsCloseObserver.observe(document.body, { childList: true, subtree: true });
+            }
+
+            if (loadActionsContainer && !loadActionsContainer.isConnected) {
+                loadActionsContainer = null;
+            }
+
+            if (calculatorContainer && !calculatorContainer.isConnected) {
+                calculatorContainer = null;
+                capturedMainRows = null;
+                extractedSolvesMain.length = 0;
+                extractedSolvesDetails.length = 0;
+                useDetailsForStats = false;
+                loadedScope = 'none';
+                if (loadActionsContainer) {
+                    loadActionsContainer.remove();
+                    loadActionsContainer = null;
+                }
+            }
+
+            if (settings.statsAverages?.getValue() !== false) {
+                ensureAdvancedStatsButton();
             }
 
             tables.forEach((table, index) => {
@@ -5526,17 +6051,69 @@
             });
         }
 
+        function resetAdvancedStats() {
+            if (statsResetRaf !== null) {
+                cancelAnimationFrame(statsResetRaf);
+                statsResetRaf = null;
+            }
+            if (calcDebounce) {
+                clearTimeout(calcDebounce);
+                calcDebounce = null;
+            }
+            destroyCharts();
+            destroyCalculator();
+            if (loadActionsContainer) {
+                loadActionsContainer.remove();
+                loadActionsContainer = null;
+            }
+            capturedMainRows = null;
+            extractedSolvesMain.length = 0;
+            extractedSolvesDetails.length = 0;
+            useDetailsForStats = false;
+            loadedScope = 'none';
+            if (settings.statsAverages?.getValue() !== false) {
+                ensureAdvancedStatsButton();
+            }
+        }
+
+        function scheduleAdvancedStatsReset() {
+            if (isLoadingSessionSolves) return;
+            if (!calculatorContainer && !loadActionsContainer && loadedScope === 'none') return;
+            if (statsResetRaf !== null) return;
+            statsResetRaf = requestAnimationFrame(() => {
+                statsResetRaf = null;
+                if (isLoadingSessionSolves) return;
+                resetAdvancedStats();
+            });
+        }
+
         function observeTables() {
             const tables = document.querySelectorAll('.session-statistics-table');
-            const mainTable = tables[0];
-            makeTableSortable(mainTable);
-            //sortTable(mainTable, 0); //reverse id by default
 
-            tables.forEach((table) => {
+            const mainTable = tables[0] || null;
+            if (mainTable !== observedMainTable) {
+                observedMainTable = mainTable;
+                if (!isLoadingSessionSolves && Date.now() >= ignoreStatsTableMutationsUntil && mainTable &&
+                    (calculatorContainer || loadActionsContainer || loadedScope !== 'none')) {
+                    resetAdvancedStats();
+                }
+            }
+
+            tables.forEach((table, index) => {
                 if (table.hasAttribute('data-observer-initialized')) return;
                 table.setAttribute('data-observer-initialized', 'true');
+                const isMainTable = index === 0;
 
                 const observer = new MutationObserver(() => {
+                    if (isLoadingSessionSolves) return;
+                    if (isMainTable) {
+                        const now = Date.now();
+                        if (now < ignoreStatsTableMutationsUntil) {
+                            ignoreStatsTableMutationsUntil = now + 750;
+                        } else if (now - lastStatsScrollAt >= 1000) {
+                            scheduleAdvancedStatsReset();
+                        }
+                    }
                     addSolveRowListeners();
                 });
 
@@ -5544,6 +6121,21 @@
             });
 
             addSolveRowListeners();
+        }
+
+        function watchStatsTables() {
+            if (statsTablesWatcher) return;
+            statsTablesWatcher = new MutationObserver(() => {
+                if (statsTablesCheckRaf !== null) return;
+                statsTablesCheckRaf = requestAnimationFrame(() => {
+                    statsTablesCheckRaf = null;
+                    if (!document.querySelector('.session-statistics-page-container')) return;
+                    if (document.querySelector('.session-statistics-table:not([data-observer-initialized])')) {
+                        observeTables();
+                    }
+                });
+            });
+            statsTablesWatcher.observe(document.body, { childList: true, subtree: true });
         }
 
         // ==================== AVERAGE CALCULATOR ====================
@@ -5954,11 +6546,19 @@
             const headers = Array.from(targetTable.querySelectorAll('thead th')).map(th => th.textContent.trim());
             const isFMC = headers.includes('Optimals') || headers.includes('Attempts');
 
-            const rows = targetTable.querySelector('tbody')?.querySelectorAll('tr') || [];
+            let rowCellsList;
+            if (!useDetailsForStats && capturedMainRows && capturedMainRows.length) {
+                rowCellsList = capturedMainRows;
+            } else {
+                const rows = targetTable.querySelector('tbody')?.querySelectorAll('tr') || [];
+                rowCellsList = Array.from(rows).map(row =>
+                    Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim())
+                );
+            }
             const solves = [];
 
-            rows.forEach((row, rowIndex) => {
-                const c = (i) => row.querySelectorAll('td')[i]?.textContent.trim() || '';
+            rowCellsList.forEach((cells, rowIndex) => {
+                const c = (i) => cells[i] || '';
 
                 const isDetailsFMC = useDetailsForStats && isFMC;
                 const timeIdx = isDetailsFMC ? 2 : 1;
@@ -6160,20 +6760,6 @@
             }
             select.value = valueToSet;
             select.dataset.slidyScope = scopeKey;
-        }
-
-        function applySolveRowFilters(solves) {
-            if (useDetailsForStats) return;
-
-            const table = document.querySelector('.session-statistics-table');
-            const rows = table?.querySelectorAll('tbody tr');
-            if (!rows) return;
-
-            const visibleIds = new Set(filterSolves(solves).map(solve => solve.solveId));
-            rows.forEach(row => {
-                const solveId = parseInt(row.querySelectorAll('td')[0]?.textContent.trim()) || 0;
-                row.style.display = visibleIds.has(solveId) ? '' : 'none';
-            });
         }
 
         function clearSolveRowFilters() {
@@ -6578,10 +7164,8 @@
             if (!useDetailsForStats) updateSessionFilterOptions(allSolves);
             updateFilterSummary();
             if (!useDetailsForStats) {
-                const table = document.querySelector('.session-statistics-table')
-                addSortingListeners(table);
                 solves = filterSolves(allSolves);
-                applySolveRowFilters(allSolves);
+                clearSolveRowFilters();
                 if (resetBtn) resetBtn.style.display = 'none';
             } else {
                 clearSolveRowFilters();
@@ -7772,7 +8356,9 @@
                     graphsContainer.style.display = '';
                     calculatorContainer?.classList.remove('no-graphs');
                 }
-                setTimeout(() => calculateAvgs?.(), 50);
+                if (calculatorContainer && calculatorContainer.isConnected) {
+                    setTimeout(() => calculateAvgs?.(), 50);
+                }
             } else {
                 if (graphsContainer) {
                     graphsContainer.style.display = 'none';
@@ -7783,10 +8369,10 @@
 
         function toggleCalculator(show) {
             if (show) {
-                if (calculatorContainer) {
+                if (calculatorContainer && calculatorContainer.isConnected) {
                     calculatorContainer.style.display = '';
                 } else {
-                    handleCalculateOrClick?.();
+                    ensureAdvancedStatsButton();
                 }
             } else {
                 if (calculatorContainer) {
@@ -7811,6 +8397,10 @@
         }
 
         function startStats() {
+            watchStatsTables();
+            document.addEventListener('scroll', () => {
+                lastStatsScrollAt = Date.now();
+            }, true);
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'q' || e.key === 'Q') {
                     setTimeout(observeTables, 10);
@@ -7883,144 +8473,6 @@
         }
 
         return true;
-    }
-
-    function parseTimeToSecondsSorting(timeStr) {
-        if (!timeStr) return 0;
-        if (timeStr === 'DNF') return DNF_TIME;
-
-        timeStr = timeStr.trim();
-
-        // Check if it contains colons (time format like 1:00.543 or 1:02.065)
-        if (timeStr.includes(':')) {
-            const parts = timeStr.split(':');
-
-            if (parts.length === 3) {
-                // Format: hours:minutes:seconds (e.g., 1:02:05.123)
-                const hours = parseInt(parts[0]) || 0;
-                const minutes = parseInt(parts[1]) || 0;
-                const seconds = parseFloat(parts[2]) || 0;
-                return hours * 3600 + minutes * 60 + seconds;
-            } else if (parts.length === 2) {
-                // Format: minutes:seconds (e.g., 1:00.543)
-                const minutes = parseInt(parts[0]) || 0;
-                const seconds = parseFloat(parts[1]) || 0;
-                return minutes * 60 + seconds;
-            }
-        }
-
-        const parsed = parseFloat(timeStr);
-        return isNaN(parsed) ? DNF_TIME : parsed;
-    }
-
-    let currentlySorting = false;
-    function sortTable(table, columnIndex, forceDirection = null) {
-        currentlySorting = true;
-        const tbody = table.querySelector('tbody');
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        const headers = table.querySelectorAll('th');
-
-        const headerText = headers[columnIndex].textContent.trim();
-        let newDirection;
-
-        if (forceDirection) {
-            newDirection = forceDirection;
-        } else {
-            const currentDirection = table.getAttribute(`data-sort-direction-${columnIndex}`);
-            if (!currentDirection) {
-                if (headerText === 'TPS' || headerText === 'Solve') {
-                    newDirection = 'desc';
-                } else {
-                    newDirection = 'asc';
-                }
-            } else {
-                newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-            }
-        }
-
-        for (let i = 0; i < headers.length; i++) {
-            table.removeAttribute(`data-sort-direction-${i}`);
-        }
-
-        table.setAttribute(`data-sort-direction-${columnIndex}`, newDirection);
-
-        rows.sort((a, b) => {
-            const cellA = a.querySelectorAll('td')[columnIndex];
-            const cellB = b.querySelectorAll('td')[columnIndex];
-
-            let valueA = cellA.textContent.trim();
-            let valueB = cellB.textContent.trim();
-
-            let compareResult;
-
-            if (headerText === 'Time') {
-                const timeA = parseTimeToSecondsSorting(valueA);
-                const timeB = parseTimeToSecondsSorting(valueB);
-                compareResult = timeA - timeB;
-            } else if (headerText === 'Solve' || headerText === 'Moves' || headerText === 'Optimals') {
-                valueA = parseInt(valueA) || DNF_MOVES;
-                valueB = parseInt(valueB) || DNF_MOVES;
-                compareResult = valueA - valueB;
-            } else if (headerText === 'TPS') {
-                const toNumber = (val) => {
-                    if (val === '∞') return Infinity;
-                    const num = parseFloat(val);
-                    return isNaN(num) ? DNF_TPS_BAD : num;
-                };
-                valueA = toNumber(valueA);
-                valueB = toNumber(valueB);
-                compareResult = valueA - valueB;
-            } else if (headerText === 'Timestamp') {
-                valueA = new Date(valueA);
-                valueB = new Date(valueB);
-                compareResult = valueA - valueB;
-            } else {
-                const numA = parseFloat(valueA);
-                const numB = parseFloat(valueB);
-                if (!isNaN(numA) && !isNaN(numB) && valueA !== '' && valueB !== '') {
-                    compareResult = numA - numB;
-                } else {
-                    compareResult = valueA.localeCompare(valueB);
-                }
-            }
-
-            return newDirection === 'asc' ? compareResult : -compareResult;
-        });
-
-        rows.forEach(row => tbody.appendChild(row));
-        setTimeout(() => {
-            currentlySorting = false;
-        }, 0);
-    }
-
-    function addSortingListeners(table) {
-        if (!table) return;
-        const headers = table.querySelectorAll('th');
-        headers.forEach((header, index) => {
-            if (index === headers.length - 1) return; // Skip the last header
-            const newHeader = header.cloneNode(true);
-            header.parentNode.replaceChild(newHeader, header);
-            newHeader.addEventListener('click', () => sortTable(table, index));
-        });
-    }
-
-    function makeTableSortable(table) {
-        if (!table) return;
-
-        // Check if table already has sorting enabled
-        if (table.hasAttribute('data-sortable')) return;
-
-        // Mark table as sortable
-        table.setAttribute('data-sortable', 'true');
-
-        const headers = table.querySelectorAll('th');
-
-        headers.forEach((header, index) => {
-            if (index === headers.length - 1) return; // Skip the last header
-            header.style.cursor = 'pointer';
-            header.title = `Click to sort by ${header.textContent.trim()}`;
-        });
-        //addSortingListeners(table);
     }
 
     function swapSessionElements() {
