@@ -5922,13 +5922,15 @@
                 return;
             }
 
-            const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
-            if (!tablesContainer) return;
+            const actionsContainer = loadActionsContainer?.isConnected
+                ? loadActionsContainer
+                : document.querySelector('.avgs-load-actions');
+            if (!actionsContainer) return;
             if (!autoLoadStatus || !autoLoadStatus.isConnected) {
-                autoLoadStatus = document.createElement('div');
+                autoLoadStatus = document.createElement('span');
                 autoLoadStatus.className = 'avgs-load-status';
-                autoLoadStatus.style.cssText = 'margin: 8px 0; color: #ccc; font-size: 13px;';
-                tablesContainer.parentNode.insertBefore(autoLoadStatus, tablesContainer);
+                autoLoadStatus.style.cssText = 'align-self: center; color: #ccc; font-size: 13px;';
+                actionsContainer.appendChild(autoLoadStatus);
             }
             autoLoadStatus.textContent = message;
         }
