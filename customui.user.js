@@ -5949,20 +5949,35 @@
             allBtn.textContent = 'Load Advanced session stats (all solves)';
         }
 
-        function getShowingSelection(select = document.querySelector('.session-statistics-page-header-container select')) {
-            if (!select) return null;
-            const value = select.value.trim();
-            const label = select.selectedOptions?.[0]?.textContent?.trim() || '';
+        function parseShowingOption(option) {
+            if (!option) return null;
+            const value = String(option.value || '').trim();
+            const label = String(option.label || option.textContent || '').replace(/\s+/g, ' ').trim();
             if (/^all$/i.test(value) || /^all$/i.test(label)) {
                 return { key: 'All', isAll: true, count: null };
             }
 
-            const averageMatch = `${label} ${value}`.match(/average\s+of\s+([\d,]+)/i);
+            const averageMatch = `${label} ${value}`.match(/\baverage\s*of\s*([\d,]+)/i);
             const count = averageMatch
                 ? Number(averageMatch[1].replace(/,/g, ''))
                 : (/^single$/i.test(label) ? 1 : Number(value));
             if (!Number.isFinite(count) || count <= 0) return null;
             return { key: String(count), isAll: false, count };
+        }
+
+        function getShowingSelect(page = document.querySelector('.session-statistics-page-container')) {
+            if (!page) return null;
+            return Array.from(page.querySelectorAll('select')).find(select =>
+                Array.from(select.options).some(option => {
+                    const text = `${option.label || option.textContent || ''} ${option.value || ''}`;
+                    return /^all$/i.test(option.value.trim()) || /^all$/i.test(option.label.trim()) || /\baverage\s*of\b/i.test(text);
+                })
+            ) || null;
+        }
+
+        function getShowingSelection(select = getShowingSelect()) {
+            if (!select) return null;
+            return parseShowingOption(select.selectedOptions?.[0] || select.options[select.selectedIndex]);
         }
 
         function ensureAdvancedStatsButton() {
@@ -6090,7 +6105,7 @@
 
         function syncShowingSelection() {
             const page = document.querySelector('.session-statistics-page-container');
-            const select = page?.querySelector('.session-statistics-page-header-container select');
+            const select = getShowingSelect(page);
             if (!page || !select) {
                 showingPage = null;
                 showingSelect = null;
@@ -8566,7 +8581,8 @@
             syncShowingSelection();
             document.addEventListener('change', (event) => {
                 const select = event.target;
-                if (!select.matches?.('.session-statistics-page-header-container select')) return;
+                const page = select.closest?.('.session-statistics-page-container');
+                if (!page || getShowingSelect(page) !== select) return;
                 showingPage = select.closest('.session-statistics-page-container');
                 showingSelect = select;
                 autoLoadedValue = null;
