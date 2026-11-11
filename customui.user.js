@@ -1481,6 +1481,12 @@
         .timer-hack {
             min-width: 336px;
         }
+        .stats-grid-container td {
+            padding: 5px !important;
+        }
+        .stats-grid-statistics-button {
+            display: none !important;
+        }
     `);
 
     let adjustButton = null;
@@ -5063,10 +5069,12 @@
         let autoLoadRetryTimer = null;
         let autoLoadRetryCount = 0;
         let ignoreStatsTableMutationsUntil = 0;
+        let ignoreStatsTableResetUntil = 0;
         let statsResetRaf = null;
         let statsTablesWatcher = null;
         let statsTablesCheckRaf = null;
         let observedMainTable = null;
+        let observedMainTableContentSignature = '';
         let lastStatsScrollAt = 0;
 
 
@@ -5519,6 +5527,15 @@
                 });
             });
             return rows;
+        }
+
+        function getMainTableContentSignature(table) {
+            if (!table) return '';
+            const rows = Array.from(table.querySelectorAll('tbody tr'), row =>
+                Array.from(row.querySelectorAll('td'), cell => cell.textContent.trim())
+            );
+            rows.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+            return JSON.stringify(rows);
         }
 
         function getTableSignature(targets) {
@@ -6183,7 +6200,13 @@
             }
 
             if (calculatorContainer && !calculatorContainer.isConnected) {
-                resetAdvancedStats();
+                const innerContainer = document.querySelector('.session-statistics-page-inner-container');
+                const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
+                if (tablesContainer) {
+                    (tablesContainer.parentNode || innerContainer)?.insertBefore(calculatorContainer, tablesContainer);
+                } else {
+                    resetAdvancedStats();
+                }
             }
 
             if (settings.statsAverages?.getValue() !== false) {
@@ -6260,14 +6283,21 @@
 
             const mainTable = tables[0] || null;
             if (mainTable !== observedMainTable) {
+                const contentSignature = getMainTableContentSignature(mainTable);
+                const tableContentsChanged = observedMainTable !== null
+                    && contentSignature !== observedMainTableContentSignature;
                 observedMainTable = mainTable;
-                autoLoadedValue = null;
-                autoLoadRetryCount = 0;
-                if (autoLoadRetryTimer) {
-                    clearTimeout(autoLoadRetryTimer);
-                    autoLoadRetryTimer = null;
+                observedMainTableContentSignature = contentSignature;
+                if (tableContentsChanged) {
+                    autoLoadedValue = null;
+                    autoLoadRetryCount = 0;
+                    if (autoLoadRetryTimer) {
+                        clearTimeout(autoLoadRetryTimer);
+                        autoLoadRetryTimer = null;
+                    }
                 }
-                if (mainTable && (isLoadingSessionSolves || (Date.now() >= ignoreStatsTableMutationsUntil &&
+                if (mainTable && tableContentsChanged && Date.now() >= ignoreStatsTableResetUntil &&
+                    (isLoadingSessionSolves || (Date.now() >= ignoreStatsTableMutationsUntil &&
                     (calculatorContainer || loadActionsContainer || loadedScope !== 'none')))) {
                     resetAdvancedStats();
                 }
@@ -6277,9 +6307,16 @@
                 if (table.hasAttribute('data-observer-initialized')) return;
                 table.setAttribute('data-observer-initialized', 'true');
                 const isMainTable = index === 0;
+                let lastContentSignature = isMainTable ? getMainTableContentSignature(table) : '';
 
                 const observer = new MutationObserver(() => {
-                    if (!isLoadingSessionSolves && isMainTable) {
+                    const contentSignature = isMainTable ? getMainTableContentSignature(table) : '';
+                    const isCurrentMainTable = isMainTable && table === observedMainTable;
+                    const rowContentsChanged = isCurrentMainTable && contentSignature !== lastContentSignature;
+                    lastContentSignature = contentSignature;
+                    if (isCurrentMainTable) observedMainTableContentSignature = contentSignature;
+
+                    if (!isLoadingSessionSolves && rowContentsChanged && Date.now() >= ignoreStatsTableResetUntil) {
                         const now = Date.now();
                         if (now < ignoreStatsTableMutationsUntil) {
                             ignoreStatsTableMutationsUntil = now + 750;
@@ -8581,6 +8618,11 @@
         function startStats() {
             watchStatsTables();
             syncShowingSelection();
+            document.addEventListener('click', (event) => {
+                if (event.target.closest?.('.session-statistics-table thead')) {
+                    ignoreStatsTableResetUntil = Date.now() + 2000;
+                }
+            }, true);
             document.addEventListener('change', (event) => {
                 const select = event.target;
                 const page = select.closest?.('.session-statistics-page-container');
