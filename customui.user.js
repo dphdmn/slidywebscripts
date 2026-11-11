@@ -5052,6 +5052,7 @@
         let loadActionsContainer = null;
         let loadedScope = 'none';
         let isLoadingSessionSolves = false;
+        let sessionStatsLoadId = 0;
         let ignoreStatsTableMutationsUntil = 0;
         let statsResetRaf = null;
         let statsTablesWatcher = null;
@@ -5782,41 +5783,44 @@
             return { found: false, rows };
         }
 
-        async function loadSessionSolves(scope, onProgress) {
+        async function loadSessionSolves(scope, onProgress, loadId) {
             isLoadingSessionSolves = true;
             try {
-                return await loadSessionSolvesInternal(scope, onProgress);
+                return await loadSessionSolvesInternal(scope, onProgress, loadId);
             } finally {
-                if (document.hidden) {
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                } else {
-                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                if (loadId === sessionStatsLoadId) {
+                    isLoadingSessionSolves = false;
+                    ignoreStatsTableMutationsUntil = Date.now() + 750;
+                    addSolveRowListeners();
                 }
-                isLoadingSessionSolves = false;
-                ignoreStatsTableMutationsUntil = Date.now() + 750;
-                addSolveRowListeners();
             }
         }
 
-        async function loadSessionSolvesInternal(scope, onProgress) {
+        async function loadSessionSolvesInternal(scope, onProgress, loadId) {
+            const isCancelled = () => loadId !== sessionStatsLoadId;
             let table = document.querySelector('.session-statistics-table');
-            if (!table) return false;
+            if (!table || isCancelled()) return false;
 
             let targets = getSessionStatsScrollTargets();
             const deadline = Date.now() + 120000;
 
             for (let i = 0; i < 10 && !table.querySelector('tbody tr'); i++) {
                 await waitForTableChange(targets, null, 12);
+                if (isCancelled()) return false;
             }
 
             scrollTargetsTo(targets, false);
 
             if (scope === 'last') {
                 await waitForTableChange(targets, () => scrollTargetsTo(targets, false), 6);
+                if (isCancelled()) return false;
                 await ensureSolveHeaderNewestFirst(targets);
+                if (isCancelled()) return false;
                 table = document.querySelector('.session-statistics-table');
+                if (!table) return false;
                 targets = getSessionStatsScrollTargets();
                 await waitForTableChange(targets, () => scrollTargetsTo(targets, false), 6);
+                if (isCancelled()) return false;
             }
 
             const hasLatestSessionGap = (rowsMap) => {
@@ -5831,12 +5835,12 @@
             captureMainTableRows(rowsMap);
 
             if (hasLatestSessionGap(rowsMap)) {
-                return finalizeCapturedRows(rowsMap, scope);
+                return !isCancelled() && finalizeCapturedRows(rowsMap, scope);
             }
 
             let quietRounds = 0;
 
-            while (Date.now() < deadline) {
+            while (Date.now() < deadline && !isCancelled()) {
                 const currentTable = document.querySelector('.session-statistics-table');
                 if (!currentTable) break;
                 if (currentTable !== table) {
@@ -5853,6 +5857,7 @@
                 } else {
                     await waitForTableChange(targets, () => stepScrollTargets(targets, 0.85), 1);
                 }
+                if (isCancelled()) return false;
 
                 captureMainTableRows(rowsMap);
 
@@ -5870,10 +5875,13 @@
                 }
             }
 
-            return finalizeCapturedRows(rowsMap, scope);
+            return !isCancelled() && finalizeCapturedRows(rowsMap, scope);
         }
 
         function showAdvancedStats() {
+            document.querySelectorAll('.avgs-calculator-container').forEach(element => {
+                if (element !== calculatorContainer) element.remove();
+            });
             if (calculatorContainer && calculatorContainer.isConnected) {
                 calculatorContainer.style.display = '';
                 return;
@@ -5918,6 +5926,9 @@
             const innerContainer = document.querySelector('.session-statistics-page-inner-container');
             const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
             if (!innerContainer || !tablesContainer) return;
+            document.querySelectorAll('.avgs-load-actions').forEach(element => {
+                if (element !== loadActionsContainer) element.remove();
+            });
             if (loadedScope === 'all' && calculatorContainer && calculatorContainer.isConnected) return;
 
             if (loadActionsContainer && loadActionsContainer.isConnected) {
@@ -5945,6 +5956,7 @@
 
             const runLoad = async (scope, button) => {
                 if (container.dataset.loading === 'true') return;
+                const loadId = ++sessionStatsLoadId;
                 container.dataset.loading = 'true';
                 container.querySelectorAll('button').forEach(btn => { btn.disabled = true; });
                 const originalText = button.textContent;
@@ -5953,7 +5965,9 @@
                 try {
                     const loaded = await loadSessionSolves(scope, (count) => {
                         button.textContent = `Loading ${label}... ${count} loaded`;
-                    });
+                    }, loadId);
+
+                    if (loadId !== sessionStatsLoadId || !container.isConnected) return;
 
                     if (!loaded) {
                         container.dataset.loading = 'false';
@@ -5973,6 +5987,7 @@
                     updateLoadActionsState();
                     handleCalculateOrClick();
                 } catch (error) {
+                    if (loadId !== sessionStatsLoadId || !container.isConnected) return;
                     console.error('Failed to load advanced stats:', error);
                     container.dataset.loading = 'false';
                     button.textContent = originalText;
@@ -5997,6 +6012,9 @@
                     const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
                     if (!tablesContainer) {
                         document.querySelector('#closeReplayBtn')?.click();
+                        cancelSessionSolvesLoad();
+                        resetAdvancedStats();
+                        observedMainTable = null;
                         statsCloseObserver.disconnect();
                         statsCloseObserver = null;
                     }
@@ -6009,16 +6027,7 @@
             }
 
             if (calculatorContainer && !calculatorContainer.isConnected) {
-                calculatorContainer = null;
-                capturedMainRows = null;
-                extractedSolvesMain.length = 0;
-                extractedSolvesDetails.length = 0;
-                useDetailsForStats = false;
-                loadedScope = 'none';
-                if (loadActionsContainer) {
-                    loadActionsContainer.remove();
-                    loadActionsContainer = null;
-                }
+                resetAdvancedStats();
             }
 
             if (settings.statsAverages?.getValue() !== false) {
@@ -6052,6 +6061,7 @@
         }
 
         function resetAdvancedStats() {
+            cancelSessionSolvesLoad();
             if (statsResetRaf !== null) {
                 cancelAnimationFrame(statsResetRaf);
                 statsResetRaf = null;
@@ -6066,6 +6076,7 @@
                 loadActionsContainer.remove();
                 loadActionsContainer = null;
             }
+            document.querySelectorAll('.avgs-load-actions, .avgs-calculator-container').forEach(element => element.remove());
             capturedMainRows = null;
             extractedSolvesMain.length = 0;
             extractedSolvesDetails.length = 0;
@@ -6093,8 +6104,8 @@
             const mainTable = tables[0] || null;
             if (mainTable !== observedMainTable) {
                 observedMainTable = mainTable;
-                if (!isLoadingSessionSolves && Date.now() >= ignoreStatsTableMutationsUntil && mainTable &&
-                    (calculatorContainer || loadActionsContainer || loadedScope !== 'none')) {
+                if (mainTable && (isLoadingSessionSolves || (Date.now() >= ignoreStatsTableMutationsUntil &&
+                    (calculatorContainer || loadActionsContainer || loadedScope !== 'none')))) {
                     resetAdvancedStats();
                 }
             }
@@ -8347,6 +8358,12 @@
                 currentWorker.terminate();
                 currentWorker = null;
             }
+            worker = null;
+        }
+
+        function cancelSessionSolvesLoad() {
+            sessionStatsLoadId++;
+            isLoadingSessionSolves = false;
         }
 
         function toggleGraphs(show) {
