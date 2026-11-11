@@ -4312,6 +4312,7 @@
                                 document.dispatchEvent(event);
                             });
                             observer.disconnect();
+                            setTimeout(() => _statsModule?.syncShowingSelection?.(), 0);
                         }
                     });
                     observer.observe(document.body, { childList: true, subtree: true });
@@ -5053,6 +5054,14 @@
         let loadedScope = 'none';
         let isLoadingSessionSolves = false;
         let sessionStatsLoadId = 0;
+        let showingSelect = null;
+        let showingPage = null;
+        let autoLoadedValue = null;
+        let autoLoadStatus = null;
+        let showingSyncTimer = null;
+        let showingSyncAttempts = 0;
+        let autoLoadRetryTimer = null;
+        let autoLoadRetryCount = 0;
         let ignoreStatsTableMutationsUntil = 0;
         let statsResetRaf = null;
         let statsTablesWatcher = null;
@@ -5807,6 +5816,9 @@
             for (let i = 0; i < 10 && !table.querySelector('tbody tr'); i++) {
                 await waitForTableChange(targets, null, 12);
                 if (isCancelled()) return false;
+                table = document.querySelector('.session-statistics-table');
+                if (!table) return false;
+                targets = getSessionStatsScrollTargets();
             }
 
             scrollTargetsTo(targets, false);
@@ -5903,12 +5915,29 @@
             }
         }
 
+        function updateAutoLoadStatus(message) {
+            if (!message) {
+                autoLoadStatus?.remove();
+                autoLoadStatus = null;
+                return;
+            }
+
+            const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
+            if (!tablesContainer) return;
+            if (!autoLoadStatus || !autoLoadStatus.isConnected) {
+                autoLoadStatus = document.createElement('div');
+                autoLoadStatus.className = 'avgs-load-status';
+                autoLoadStatus.style.cssText = 'margin: 8px 0; color: #ccc; font-size: 13px;';
+                tablesContainer.parentNode.insertBefore(autoLoadStatus, tablesContainer);
+            }
+            autoLoadStatus.textContent = message;
+        }
+
         function updateLoadActionsState() {
             if (!loadActionsContainer || !loadActionsContainer.isConnected) return;
             if (loadActionsContainer.dataset.loading === 'true') return;
-            const lastBtn = loadActionsContainer.querySelector('[data-scope="last"]');
             const allBtn = loadActionsContainer.querySelector('[data-scope="all"]');
-            if (!lastBtn || !allBtn) return;
+            if (!allBtn) return;
 
             if (loadedScope === 'all') {
                 loadActionsContainer.remove();
@@ -5916,16 +5945,36 @@
                 return;
             }
 
-            lastBtn.disabled = loadedScope === 'last';
-            lastBtn.textContent = loadedScope === 'last' ? 'Last session loaded' : 'Load last session';
             allBtn.disabled = false;
-            allBtn.textContent = 'Load all solves';
+            allBtn.textContent = 'Load Advanced session stats (all solves)';
+        }
+
+        function getShowingSelection(select = document.querySelector('.session-statistics-page-header-container select')) {
+            if (!select) return null;
+            const value = select.value.trim();
+            const label = select.selectedOptions?.[0]?.textContent?.trim() || '';
+            if (/^all$/i.test(value) || /^all$/i.test(label)) {
+                return { key: 'All', isAll: true, count: null };
+            }
+
+            const averageMatch = `${label} ${value}`.match(/average\s+of\s+([\d,]+)/i);
+            const count = averageMatch
+                ? Number(averageMatch[1].replace(/,/g, ''))
+                : (/^single$/i.test(label) ? 1 : Number(value));
+            if (!Number.isFinite(count) || count <= 0) return null;
+            return { key: String(count), isAll: false, count };
         }
 
         function ensureAdvancedStatsButton() {
             const innerContainer = document.querySelector('.session-statistics-page-inner-container');
             const tablesContainer = document.querySelector('.session-statistics-page-tables-container');
             if (!innerContainer || !tablesContainer) return;
+            const selection = getShowingSelection();
+            if (!selection) {
+                loadActionsContainer?.remove();
+                loadActionsContainer = null;
+                return;
+            }
             document.querySelectorAll('.avgs-load-actions').forEach(element => {
                 if (element !== loadActionsContainer) element.remove();
             });
@@ -5939,69 +5988,159 @@
             const container = document.createElement('div');
             container.className = 'avgs-load-actions';
 
-            const lastBtn = document.createElement('button');
-            lastBtn.type = 'button';
-            lastBtn.className = 'avgs-load-advanced-btn';
-            lastBtn.dataset.scope = 'last';
-            lastBtn.textContent = 'Load last session';
-
             const allBtn = document.createElement('button');
             allBtn.type = 'button';
             allBtn.className = 'avgs-load-advanced-btn';
             allBtn.dataset.scope = 'all';
-            allBtn.textContent = 'Load all solves';
+            allBtn.textContent = 'Load Advanced session stats (all solves)';
 
-            container.appendChild(lastBtn);
             container.appendChild(allBtn);
 
-            const runLoad = async (scope, button) => {
-                if (container.dataset.loading === 'true') return;
-                const loadId = ++sessionStatsLoadId;
-                container.dataset.loading = 'true';
-                container.querySelectorAll('button').forEach(btn => { btn.disabled = true; });
-                const originalText = button.textContent;
-                const label = scope === 'last' ? 'last session' : 'all solves';
-
-                try {
-                    const loaded = await loadSessionSolves(scope, (count) => {
-                        button.textContent = `Loading ${label}... ${count} loaded`;
-                    }, loadId);
-
-                    if (loadId !== sessionStatsLoadId || !container.isConnected) return;
-
-                    if (!loaded) {
-                        container.dataset.loading = 'false';
-                        button.textContent = originalText;
-                        updateLoadActionsState();
-                        return;
-                    }
-
-                    button.textContent = 'Computing...';
-                    extractedSolvesMain.length = 0;
-                    extractedSolvesDetails.length = 0;
-                    useDetailsForStats = false;
-                    loadedScope = scope;
-                    container.dataset.loading = 'false';
-
-                    showAdvancedStats();
-                    updateLoadActionsState();
-                    handleCalculateOrClick();
-                } catch (error) {
-                    if (loadId !== sessionStatsLoadId || !container.isConnected) return;
-                    console.error('Failed to load advanced stats:', error);
-                    container.dataset.loading = 'false';
-                    button.textContent = originalText;
-                    updateLoadActionsState();
-                }
-            };
-
-            lastBtn.addEventListener('click', () => runLoad('last', lastBtn));
-            allBtn.addEventListener('click', () => runLoad('all', allBtn));
+            allBtn.addEventListener('click', () => runAdvancedStatsLoad('all', allBtn));
 
             loadActionsContainer = container;
             const parent = tablesContainer.parentNode || innerContainer;
             parent.insertBefore(container, tablesContainer);
             updateLoadActionsState();
+        }
+
+        async function runAdvancedStatsLoad(scope, button = null) {
+            const container = button?.closest('.avgs-load-actions') || null;
+            if (isLoadingSessionSolves || container?.dataset.loading === 'true') return;
+
+            const loadId = ++sessionStatsLoadId;
+            const originalText = button?.textContent || '';
+            const sessionLabel = scope === 'last' ? 'latest session' : 'all solves';
+            if (container) {
+                container.dataset.loading = 'true';
+                container.querySelectorAll('button').forEach(item => { item.disabled = true; });
+            } else {
+                updateAutoLoadStatus(`Loading Advanced session stats for ${sessionLabel}...`);
+            }
+
+            const setProgress = (text) => {
+                if (button) button.textContent = text;
+                else updateAutoLoadStatus(text);
+            };
+
+            try {
+                const loaded = await loadSessionSolves(scope, count => {
+                    setProgress(`Loading Advanced session stats for ${sessionLabel}... ${count} solves loaded`);
+                }, loadId);
+
+                if (loadId !== sessionStatsLoadId || (container && !container.isConnected)) return;
+
+                if (!loaded) {
+                    if (container) {
+                        container.dataset.loading = 'false';
+                        if (button) button.textContent = originalText;
+                        updateLoadActionsState();
+                    } else {
+                        updateAutoLoadStatus(`Could not load Advanced session stats for ${sessionLabel}.`);
+                        autoLoadedValue = null;
+                        scheduleAutomaticLoadRetry();
+                    }
+                    return;
+                }
+
+                setProgress(`Calculating Advanced session stats for ${sessionLabel}...`);
+                extractedSolvesMain.length = 0;
+                extractedSolvesDetails.length = 0;
+                useDetailsForStats = false;
+                loadedScope = scope;
+                if (container) container.dataset.loading = 'false';
+
+                showAdvancedStats();
+                updateLoadActionsState();
+                handleCalculateOrClick();
+                updateAutoLoadStatus(`Advanced session stats loaded for ${sessionLabel}.`);
+                autoLoadRetryCount = 0;
+            } catch (error) {
+                if (loadId !== sessionStatsLoadId || (container && !container.isConnected)) return;
+                console.error('Failed to load advanced stats:', error);
+                if (container) {
+                    container.dataset.loading = 'false';
+                    if (button) button.textContent = originalText;
+                    updateLoadActionsState();
+                } else {
+                    updateAutoLoadStatus(`Failed to load Advanced session stats for ${sessionLabel}.`);
+                    autoLoadedValue = null;
+                    scheduleAutomaticLoadRetry();
+                }
+            }
+        }
+
+        function scheduleAutomaticLoadRetry() {
+            if (autoLoadRetryTimer || autoLoadRetryCount >= 3) return;
+            autoLoadRetryCount++;
+            autoLoadRetryTimer = setTimeout(() => {
+                autoLoadRetryTimer = null;
+                syncShowingSelection();
+            }, autoLoadRetryCount * 1000);
+        }
+
+        function scheduleShowingSelectionSync() {
+            if (showingSyncTimer || showingSyncAttempts >= 20) return;
+            showingSyncAttempts++;
+            showingSyncTimer = setTimeout(() => {
+                showingSyncTimer = null;
+                syncShowingSelection();
+            }, 50);
+        }
+
+        function syncShowingSelection() {
+            const page = document.querySelector('.session-statistics-page-container');
+            const select = page?.querySelector('.session-statistics-page-header-container select');
+            if (!page || !select) {
+                showingPage = null;
+                showingSelect = null;
+                autoLoadedValue = null;
+                showingSyncAttempts = 0;
+                updateAutoLoadStatus('');
+                return;
+            }
+
+            if (page !== showingPage || select !== showingSelect) {
+                showingPage = page;
+                showingSelect = select;
+                autoLoadedValue = null;
+                autoLoadRetryCount = 0;
+            }
+
+            const selection = getShowingSelection(select);
+            if (!selection) {
+                scheduleShowingSelectionSync();
+                return;
+            }
+            showingSyncAttempts = 0;
+
+            if (settings.statsAverages?.getValue() === false) {
+                loadActionsContainer?.remove();
+                loadActionsContainer = null;
+                updateAutoLoadStatus('');
+                return;
+            }
+
+            if (selection.isAll) {
+                ensureAdvancedStatsButton();
+                if (autoLoadedValue !== selection.key && !isLoadingSessionSolves) {
+                    autoLoadedValue = selection.key;
+                    runAdvancedStatsLoad('last');
+                }
+                return;
+            }
+
+            updateAutoLoadStatus('');
+            if (selection.count <= 1000) {
+                ensureAdvancedStatsButton();
+                if (autoLoadedValue !== selection.key && !isLoadingSessionSolves) {
+                    autoLoadedValue = selection.key;
+                    runAdvancedStatsLoad('all');
+                }
+            } else {
+                autoLoadedValue = null;
+                ensureAdvancedStatsButton();
+            }
         }
 
         function addSolveRowListeners() {
@@ -6062,6 +6201,7 @@
 
         function resetAdvancedStats() {
             cancelSessionSolvesLoad();
+            updateAutoLoadStatus('');
             if (statsResetRaf !== null) {
                 cancelAnimationFrame(statsResetRaf);
                 statsResetRaf = null;
@@ -6104,6 +6244,12 @@
             const mainTable = tables[0] || null;
             if (mainTable !== observedMainTable) {
                 observedMainTable = mainTable;
+                autoLoadedValue = null;
+                autoLoadRetryCount = 0;
+                if (autoLoadRetryTimer) {
+                    clearTimeout(autoLoadRetryTimer);
+                    autoLoadRetryTimer = null;
+                }
                 if (mainTable && (isLoadingSessionSolves || (Date.now() >= ignoreStatsTableMutationsUntil &&
                     (calculatorContainer || loadActionsContainer || loadedScope !== 'none')))) {
                     resetAdvancedStats();
@@ -6116,8 +6262,7 @@
                 const isMainTable = index === 0;
 
                 const observer = new MutationObserver(() => {
-                    if (isLoadingSessionSolves) return;
-                    if (isMainTable) {
+                    if (!isLoadingSessionSolves && isMainTable) {
                         const now = Date.now();
                         if (now < ignoreStatsTableMutationsUntil) {
                             ignoreStatsTableMutationsUntil = now + 750;
@@ -6125,13 +6270,15 @@
                             scheduleAdvancedStatsReset();
                         }
                     }
-                    addSolveRowListeners();
+                    if (!isLoadingSessionSolves) addSolveRowListeners();
+                    syncShowingSelection();
                 });
 
                 observer.observe(table, { childList: true, subtree: true });
             });
 
             addSolveRowListeners();
+            syncShowingSelection();
         }
 
         function watchStatsTables() {
@@ -6140,6 +6287,7 @@
                 if (statsTablesCheckRaf !== null) return;
                 statsTablesCheckRaf = requestAnimationFrame(() => {
                     statsTablesCheckRaf = null;
+                    syncShowingSelection();
                     if (!document.querySelector('.session-statistics-page-container')) return;
                     if (document.querySelector('.session-statistics-table:not([data-observer-initialized])')) {
                         observeTables();
@@ -8389,7 +8537,7 @@
                 if (calculatorContainer && calculatorContainer.isConnected) {
                     calculatorContainer.style.display = '';
                 } else {
-                    ensureAdvancedStatsButton();
+                    syncShowingSelection();
                 }
             } else {
                 if (calculatorContainer) {
@@ -8415,6 +8563,22 @@
 
         function startStats() {
             watchStatsTables();
+            syncShowingSelection();
+            document.addEventListener('change', (event) => {
+                const select = event.target;
+                if (!select.matches?.('.session-statistics-page-header-container select')) return;
+                showingPage = select.closest('.session-statistics-page-container');
+                showingSelect = select;
+                autoLoadedValue = null;
+                autoLoadRetryCount = 0;
+                if (autoLoadRetryTimer) {
+                    clearTimeout(autoLoadRetryTimer);
+                    autoLoadRetryTimer = null;
+                }
+                resetAdvancedStats();
+                showingSyncAttempts = 0;
+                setTimeout(syncShowingSelection, 0);
+            }, true);
             document.addEventListener('scroll', () => {
                 lastStatsScrollAt = Date.now();
             }, true);
@@ -8432,7 +8596,8 @@
             destroyCharts,
             toggleGraphs,
             toggleCalculator,
-            toggleOverlay
+            toggleOverlay,
+            syncShowingSelection
         };
     }
 
