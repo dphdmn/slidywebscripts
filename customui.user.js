@@ -33,6 +33,12 @@
     };
     // Inject static CSS styles via GM_addStyle
     GM_addStyle(`
+        :root {
+            --radius-sm: 0px;
+            --radius: 0px;
+            --radius-lg: 0px;
+        }
+
         .session-buttons-container {
             transition: opacity 0.2s ease;
         }
@@ -229,6 +235,9 @@
         }
         .multi-select-button,
         .ranking-table,
+        .ranking-table-container,
+        .ranking-form-container,
+        .home-container-side,
         .standard-stats-panel,
         .session-background,
         .session-statistics-page-container,
@@ -1380,7 +1389,7 @@
         .avgs-stat-item {
             display: flex;
             align-items: baseline;
-            font-size: 11px;
+            font-size: 12px;
         }
         .avgs-stat-label {
             color: #aaa;
@@ -1492,6 +1501,30 @@
         }
         .stats-grid-relay-progress-cell {
             white-space: nowrap;
+        }
+        .slidy-controls,
+        .slidy-controls *,
+        .slidy-controls *::before,
+        .slidy-controls *::after,
+        .slidy-see-stats-btn,
+        .slidy-drag-handle,
+        .avgs-load-actions,
+        .avgs-load-actions *,
+        .avgs-load-actions *::before,
+        .avgs-load-actions *::after,
+        .avgs-calculator-container,
+        .avgs-calculator-container *,
+        .avgs-calculator-container *::before,
+        .avgs-calculator-container *::after,
+        .replay-overlay,
+        .replay-overlay *,
+        .replay-overlay *::before,
+        .replay-overlay *::after,
+        #slidy-input-debug,
+        input[type="checkbox"],
+        input[type="checkbox"]::before,
+        input[type="checkbox"]::after {
+            border-radius: 0 !important;
         }
     `);
 
@@ -8342,7 +8375,7 @@
                                     },
                                     font: { size: 12, weight: 'normal' },
                                     padding: { top: 2, bottom: 2, left: 4, right: 4 },
-                                    borderRadius: 3,
+                                    borderRadius: 0,
                                     formatter: function (value, context) {
                                         const total = context.chart.data.datasets[0].data.length;
                                         if (total <= 25) {
@@ -8481,7 +8514,7 @@
                                 backgroundColor: 'rgba(0, 255, 255, 0.6)',
                                 borderColor: '#00ffff',
                                 borderWidth: 1,
-                                borderRadius: 4
+                                borderRadius: 0
                             }]
                         },
                         options: {
