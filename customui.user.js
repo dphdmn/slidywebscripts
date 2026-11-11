@@ -1487,6 +1487,12 @@
         .stats-grid-statistics-button {
             display: none !important;
         }
+        .stats-grid-relay-progress {
+            display: none !important;
+        }
+        .stats-grid-relay-progress-cell {
+            white-space: nowrap;
+        }
     `);
 
     let adjustButton = null;
@@ -4110,6 +4116,28 @@
                 row.style.display = shouldHide ? 'none' : '';
             }
         });
+
+        const relayProgress = document.querySelector('.stats-grid-relay-progress');
+        const progressMatch = relayProgress?.textContent.match(
+            /Puzzle\s+[\d,]+\s+of\s+([\d,]+)\s*[^\d\s]\s*([\d,]+)\s+solved/i
+        );
+        const timerRow = container.querySelector('tr[avg="1"]');
+        if (!timerRow) return;
+        let relayProgressCell = timerRow.querySelector('.stats-grid-relay-progress-cell');
+        if (!relayProgressCell) {
+            relayProgressCell = document.createElement('td');
+            relayProgressCell.className = 'stats-grid-relay-progress-cell';
+            timerRow.appendChild(relayProgressCell);
+        }
+        if (progressMatch) {
+            const total = progressMatch[1].replace(/,/g, '');
+            const solved = progressMatch[2].replace(/,/g, '');
+            relayProgressCell.textContent = `${solved}/${total}`;
+            relayProgressCell.style.display = '';
+        } else {
+            relayProgressCell.textContent = '';
+            relayProgressCell.style.display = 'none';
+        }
     }
 
     function minimizeSessions() {
